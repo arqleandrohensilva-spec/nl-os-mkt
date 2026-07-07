@@ -14,7 +14,180 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      dores: {
+        Row: {
+          categoria: string
+          created_at: string
+          descricao: string | null
+          id: string
+          titulo: string
+          ultima_vez_usada: string | null
+          vezes_usada: number
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          titulo: string
+          ultima_vez_usada?: string | null
+          vezes_usada?: number
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          titulo?: string
+          ultima_vez_usada?: string | null
+          vezes_usada?: number
+        }
+        Relationships: []
+      }
+      objecoes: {
+        Row: {
+          categoria: string | null
+          created_at: string
+          id: string
+          post_id: string | null
+          respondida: boolean
+          texto: string
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          post_id?: string | null
+          respondida?: boolean
+          texto: string
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          post_id?: string | null
+          respondida?: boolean
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objecoes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance: {
+        Row: {
+          comentarios: number
+          compartilhamentos: number
+          curtidas: number
+          id: string
+          post_id: string
+          registrado_em: string
+          salvamentos: number
+          views: number
+        }
+        Insert: {
+          comentarios?: number
+          compartilhamentos?: number
+          curtidas?: number
+          id?: string
+          post_id: string
+          registrado_em?: string
+          salvamentos?: number
+          views?: number
+        }
+        Update: {
+          comentarios?: number
+          compartilhamentos?: number
+          curtidas?: number
+          id?: string
+          post_id?: string
+          registrado_em?: string
+          salvamentos?: number
+          views?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          ano: number | null
+          briefing_visual: string | null
+          copy_cta: string | null
+          copy_legenda: string | null
+          copy_roteiro: string | null
+          created_at: string
+          data_publicacao: string | null
+          dor_id: string | null
+          formato: string
+          id: string
+          linha: string
+          mes: number | null
+          observacao: string | null
+          pilar: string | null
+          raciocinio: Json | null
+          semana: number | null
+          status: string
+        }
+        Insert: {
+          ano?: number | null
+          briefing_visual?: string | null
+          copy_cta?: string | null
+          copy_legenda?: string | null
+          copy_roteiro?: string | null
+          created_at?: string
+          data_publicacao?: string | null
+          dor_id?: string | null
+          formato: string
+          id?: string
+          linha: string
+          mes?: number | null
+          observacao?: string | null
+          pilar?: string | null
+          raciocinio?: Json | null
+          semana?: number | null
+          status?: string
+        }
+        Update: {
+          ano?: number | null
+          briefing_visual?: string | null
+          copy_cta?: string | null
+          copy_legenda?: string | null
+          copy_roteiro?: string | null
+          created_at?: string
+          data_publicacao?: string | null
+          dor_id?: string | null
+          formato?: string
+          id?: string
+          linha?: string
+          mes?: number | null
+          observacao?: string | null
+          pilar?: string | null
+          raciocinio?: Json | null
+          semana?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_dor_id_fkey"
+            columns: ["dor_id"]
+            isOneToOne: false
+            referencedRelation: "dores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
