@@ -304,7 +304,9 @@ function ResultadoAnalise({
     <section className="space-y-8">
       {/* Métricas */}
       <div className="grid grid-cols-2 gap-3">
-        {metricCard("Posts analisados", String(output.posts_analisados))}
+        {metricCard("Posts encontrados", String(output.total_posts_encontrados ?? output.posts_analisados))}
+        {metricCard("Média de curtidas", String(output.media_curtidas ?? 0))}
+        {metricCard("Média de comentários", String(output.media_comentarios ?? 0))}
         {metricCard("Tom predominante", output.tom_predominante)}
         {metricCard("CTA de alta pressão", output.tem_cta_alta_pressao ? "Sim" : "Não")}
         {metricCard("Emoji presente", `${output.percentual_com_emoji}%`)}
