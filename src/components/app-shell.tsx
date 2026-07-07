@@ -12,6 +12,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
 
 const NAV = [
@@ -22,6 +23,7 @@ const NAV = [
   { to: "/performance", label: "Performance", icon: BarChart3 },
   { to: "/marca", label: "Biblioteca de Marca", icon: BookOpen },
   { to: "/radar", label: "Radar de Oportunidade", icon: Radar },
+  { to: "/validar", label: "Validar peça", icon: ShieldCheck },
 ] as const;
 
 const STORAGE_KEY = "nl_mkt_sidebar_collapsed";
