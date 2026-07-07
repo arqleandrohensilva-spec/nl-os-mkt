@@ -25,7 +25,11 @@ export const gerarCopy = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Input.parse(input))
   .handler(async ({ data }): Promise<CopyOutput> => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurado");
+    if (!apiKey || !apiKey.trim()) {
+      throw new Error(
+        "A chave da Anthropic (ANTHROPIC_API_KEY) não foi configurada. Adicione o secret no backend antes de gerar copy.",
+      );
+    }
 
     const userPrompt = [
       `Linha de negócio: ${data.linha}`,
