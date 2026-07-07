@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      analises_concorrentes: {
+        Row: {
+          created_at: string
+          handle: string
+          id: string
+          legendas_brutas: string
+          nicho: string | null
+          resultado: Json
+        }
+        Insert: {
+          created_at?: string
+          handle: string
+          id?: string
+          legendas_brutas: string
+          nicho?: string | null
+          resultado: Json
+        }
+        Update: {
+          created_at?: string
+          handle?: string
+          id?: string
+          legendas_brutas?: string
+          nicho?: string | null
+          resultado?: Json
+        }
+        Relationships: []
+      }
       dores: {
         Row: {
           categoria: string
