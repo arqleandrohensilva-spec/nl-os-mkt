@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as ObjecoesRouteImport } from './routes/objecoes'
 import { Route as CopyRouteImport } from './routes/copy'
 import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as IndexRouteImport } from './routes/index'
 
+const PerformanceRoute = PerformanceRouteImport.update({
+  id: '/performance',
+  path: '/performance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ObjecoesRoute = ObjecoesRouteImport.update({
   id: '/objecoes',
   path: '/objecoes',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/calendario': typeof CalendarioRoute
   '/copy': typeof CopyRoute
   '/objecoes': typeof ObjecoesRoute
+  '/performance': typeof PerformanceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/calendario': typeof CalendarioRoute
   '/copy': typeof CopyRoute
   '/objecoes': typeof ObjecoesRoute
+  '/performance': typeof PerformanceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/calendario': typeof CalendarioRoute
   '/copy': typeof CopyRoute
   '/objecoes': typeof ObjecoesRoute
+  '/performance': typeof PerformanceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/calendario' | '/copy' | '/objecoes'
+  fullPaths: '/' | '/calendario' | '/copy' | '/objecoes' | '/performance'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/calendario' | '/copy' | '/objecoes'
-  id: '__root__' | '/' | '/calendario' | '/copy' | '/objecoes'
+  to: '/' | '/calendario' | '/copy' | '/objecoes' | '/performance'
+  id: '__root__' | '/' | '/calendario' | '/copy' | '/objecoes' | '/performance'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,10 +76,18 @@ export interface RootRouteChildren {
   CalendarioRoute: typeof CalendarioRoute
   CopyRoute: typeof CopyRoute
   ObjecoesRoute: typeof ObjecoesRoute
+  PerformanceRoute: typeof PerformanceRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/performance': {
+      id: '/performance'
+      path: '/performance'
+      fullPath: '/performance'
+      preLoaderRoute: typeof PerformanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/objecoes': {
       id: '/objecoes'
       path: '/objecoes'
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   CalendarioRoute: CalendarioRoute,
   CopyRoute: CopyRoute,
   ObjecoesRoute: ObjecoesRoute,
+  PerformanceRoute: PerformanceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
