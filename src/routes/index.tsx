@@ -189,6 +189,10 @@ function MetricCard({ label, value, small }: { label: string; value: string | nu
   );
 }
 
+export function formatBRL(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+}
+
 function Shortcut({
   to,
   icon: Icon,
