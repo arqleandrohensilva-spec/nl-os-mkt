@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { gerarCopy, type CopyOutput } from "@/lib/copy.functions";
 import { PageHeader } from "@/components/page-header";
 import { LINHAS, FORMATOS } from "@/lib/nl-brand";
-import { Loader2, Copy, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Copy, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type Search = { dor?: string; linha?: string; formato?: string; observacao?: string };
@@ -387,6 +387,3 @@ function Block({ title, children, copyable }: { title: string; children: React.R
     </section>
   );
 }
-
-// unused import guard
-void Check;
