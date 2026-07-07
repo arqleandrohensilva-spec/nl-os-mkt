@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ValidarRouteImport } from './routes/validar'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as ObjecoesRouteImport } from './routes/objecoes'
@@ -17,6 +18,11 @@ import { Route as CopyRouteImport } from './routes/copy'
 import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as IndexRouteImport } from './routes/index'
 
+const ValidarRoute = ValidarRouteImport.update({
+  id: '/validar',
+  path: '/validar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RadarRoute = RadarRouteImport.update({
   id: '/radar',
   path: '/radar',
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
   '/radar': typeof RadarRoute
+  '/validar': typeof ValidarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
   '/radar': typeof RadarRoute
+  '/validar': typeof ValidarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
   '/radar': typeof RadarRoute
+  '/validar': typeof ValidarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/objecoes'
     | '/performance'
     | '/radar'
+    | '/validar'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/objecoes'
     | '/performance'
     | '/radar'
+    | '/validar'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/objecoes'
     | '/performance'
     | '/radar'
+    | '/validar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,10 +131,18 @@ export interface RootRouteChildren {
   ObjecoesRoute: typeof ObjecoesRoute
   PerformanceRoute: typeof PerformanceRoute
   RadarRoute: typeof RadarRoute
+  ValidarRoute: typeof ValidarRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/validar': {
+      id: '/validar'
+      path: '/validar'
+      fullPath: '/validar'
+      preLoaderRoute: typeof ValidarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/radar': {
       id: '/radar'
       path: '/radar'
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   ObjecoesRoute: ObjecoesRoute,
   PerformanceRoute: PerformanceRoute,
   RadarRoute: RadarRoute,
+  ValidarRoute: ValidarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
