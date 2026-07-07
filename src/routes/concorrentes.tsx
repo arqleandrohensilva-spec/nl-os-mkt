@@ -50,12 +50,11 @@ function ConcorrentesPage() {
   const qc = useQueryClient();
 
   const [handle, setHandle] = useState("");
-  const [legendas, setLegendas] = useState("");
   const [nicho, setNicho] = useState<string>("");
   const [output, setOutput] = useState<ConcorrentesOutput | null>(null);
   const [currentHandle, setCurrentHandle] = useState<string>("");
   const [currentNicho, setCurrentNicho] = useState<string>("");
-  const [currentLegendas, setCurrentLegendas] = useState<string>("");
+  const [loadingStage, setLoadingStage] = useState<"idle" | "fetching" | "analyzing">("idle");
 
   const handleLimpo = useMemo(() => sanitizeHandle(handle), [handle]);
   const instagramUrl = handleLimpo
@@ -78,17 +77,22 @@ function ConcorrentesPage() {
     mutationFn: async () => {
       const h = sanitizeHandle(handle);
       if (!h) throw new Error("Informe o @ do perfil.");
-      if (legendas.trim().length < 50)
-        throw new Error("Cole pelo menos algumas legendas (mínimo 50 caracteres).");
-      return analisar({
-        data: { handle: h, legendas, nicho: nicho || undefined },
-      });
+      setLoadingStage("fetching");
+      // Switch label after a short delay so user sees the fetching stage
+      const t = setTimeout(() => setLoadingStage("analyzing"), 4000);
+      try {
+        return await analisar({
+          data: { handle: h, nicho: nicho || undefined },
+        });
+      } finally {
+        clearTimeout(t);
+        setLoadingStage("idle");
+      }
     },
     onSuccess: (data) => {
       setOutput(data);
       setCurrentHandle(sanitizeHandle(handle));
       setCurrentNicho(nicho);
-      setCurrentLegendas(legendas);
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -101,7 +105,7 @@ function ConcorrentesPage() {
         .insert({
           handle: currentHandle,
           nicho: currentNicho || null,
-          legendas_brutas: currentLegendas,
+          legendas_brutas: "",
           resultado: output,
         });
       if (error) throw error;
@@ -131,10 +135,8 @@ function ConcorrentesPage() {
     setOutput(a.resultado);
     setCurrentHandle(a.handle);
     setCurrentNicho(a.nicho ?? "");
-    setCurrentLegendas(a.legendas_brutas);
     setHandle(a.handle);
     setNicho(a.nicho ?? "");
-    setLegendas(a.legendas_brutas);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -170,19 +172,9 @@ function ConcorrentesPage() {
                 Abrir perfil no Instagram <ExternalLink className="h-3 w-3" />
               </a>
             )}
-          </div>
-
-          <div>
-            <label className="block font-mono text-[10px] tracking-widest text-[color:var(--bronze)] uppercase mb-2">
-              Legendas dos últimos posts
-            </label>
-            <textarea
-              value={legendas}
-              onChange={(e) => setLegendas(e.target.value)}
-              placeholder="Cole aqui as legendas dos últimos 10–15 posts do perfil. Separe cada post com uma linha em branco ou com ---"
-              className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-4 py-3 text-sm focus:border-[color:var(--bronze)] outline-none resize-y"
-              style={{ minHeight: 300 }}
-            />
+            <p className="text-xs text-[color:var(--muted-foreground)] mt-2">
+              Buscamos automaticamente os últimos 20 posts públicos do perfil.
+            </p>
           </div>
 
           <div>
@@ -210,7 +202,10 @@ function ConcorrentesPage() {
           >
             {analisarMut.isPending ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Analisando…
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {loadingStage === "analyzing"
+                  ? "Analisando estratégia…"
+                  : "Buscando posts no Instagram…"}
               </>
             ) : (
               "Analisar estratégia"
