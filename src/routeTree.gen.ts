@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as ObjecoesRouteImport } from './routes/objecoes'
+import { Route as MarcaRouteImport } from './routes/marca'
 import { Route as CopyRouteImport } from './routes/copy'
 import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as IndexRouteImport } from './routes/index'
@@ -23,6 +24,11 @@ const PerformanceRoute = PerformanceRouteImport.update({
 const ObjecoesRoute = ObjecoesRouteImport.update({
   id: '/objecoes',
   path: '/objecoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarcaRoute = MarcaRouteImport.update({
+  id: '/marca',
+  path: '/marca',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CopyRoute = CopyRouteImport.update({
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/calendario': typeof CalendarioRoute
   '/copy': typeof CopyRoute
+  '/marca': typeof MarcaRoute
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/calendario': typeof CalendarioRoute
   '/copy': typeof CopyRoute
+  '/marca': typeof MarcaRoute
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
 }
@@ -60,21 +68,36 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/calendario': typeof CalendarioRoute
   '/copy': typeof CopyRoute
+  '/marca': typeof MarcaRoute
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/calendario' | '/copy' | '/objecoes' | '/performance'
+  fullPaths:
+    | '/'
+    | '/calendario'
+    | '/copy'
+    | '/marca'
+    | '/objecoes'
+    | '/performance'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/calendario' | '/copy' | '/objecoes' | '/performance'
-  id: '__root__' | '/' | '/calendario' | '/copy' | '/objecoes' | '/performance'
+  to: '/' | '/calendario' | '/copy' | '/marca' | '/objecoes' | '/performance'
+  id:
+    | '__root__'
+    | '/'
+    | '/calendario'
+    | '/copy'
+    | '/marca'
+    | '/objecoes'
+    | '/performance'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CalendarioRoute: typeof CalendarioRoute
   CopyRoute: typeof CopyRoute
+  MarcaRoute: typeof MarcaRoute
   ObjecoesRoute: typeof ObjecoesRoute
   PerformanceRoute: typeof PerformanceRoute
 }
@@ -93,6 +116,13 @@ declare module '@tanstack/react-router' {
       path: '/objecoes'
       fullPath: '/objecoes'
       preLoaderRoute: typeof ObjecoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/marca': {
+      id: '/marca'
+      path: '/marca'
+      fullPath: '/marca'
+      preLoaderRoute: typeof MarcaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/copy': {
@@ -123,6 +153,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CalendarioRoute: CalendarioRoute,
   CopyRoute: CopyRoute,
+  MarcaRoute: MarcaRoute,
   ObjecoesRoute: ObjecoesRoute,
   PerformanceRoute: PerformanceRoute,
 }
