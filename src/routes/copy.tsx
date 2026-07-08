@@ -100,6 +100,8 @@ function MotorCopy() {
           formato,
           justificativa: output.justificativa_formato,
           raciocinio: output.raciocinio,
+          imagem_path: imagem?.url_storage ?? null,
+          imagem_id: imagem?.id ?? null,
         },
         copy_roteiro: output.copy_roteiro,
         copy_legenda: output.copy_legenda,
