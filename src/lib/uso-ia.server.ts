@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 const PRICE_INPUT = 3 / 1_000_000;
 const PRICE_OUTPUT = 15 / 1_000_000;
 // Cotação fixa temporária
-export const USD_BRL = 5.7;
+export const USD_BRL = 5.78;
 
 function serverClient() {
   return createClient(
