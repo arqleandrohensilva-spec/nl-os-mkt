@@ -6,7 +6,8 @@ import { gerarKitPublicacao, type KitOutput } from "@/lib/kit.functions";
 import { PageHeader } from "@/components/page-header";
 import { LINHAS, PILARES } from "@/lib/nl-brand";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Copy, RotateCcw, Square, Layers, Play, Briefcase, Mail, Save } from "lucide-react";
+import { Loader2, Copy, RotateCcw, Square, Layers, Play, Briefcase, Mail, Save, Image as ImageIcon, X } from "lucide-react";
+import { BibliotecaPicker, type BibliotecaImagemLite } from "@/components/biblioteca-picker";
 import { toast } from "sonner";
 
 type Search = { conteudo?: string };
@@ -26,6 +27,8 @@ function KitPublicacaoPage() {
   const [linha, setLinha] = useState<string>("A");
   const [tom, setTom] = useState<string>("");
   const [resultado, setResultado] = useState<KitOutput | null>(null);
+  const [imagem, setImagem] = useState<BibliotecaImagemLite | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (search.conteudo && !conteudo) setConteudo(search.conteudo);
@@ -34,7 +37,7 @@ function KitPublicacaoPage() {
 
   const mut = useMutation({
     mutationFn: async () =>
-      gerar({ data: { conteudo, linha: linha || undefined, tom: tom || undefined } }),
+      gerar({ data: { conteudo, linha: linha || undefined, tom: tom || undefined, imagem_contexto: imagem?.descricao_tecnica || undefined } }),
     onSuccess: (data) => setResultado(data),
     onError: (err: any) => toast.error(err?.message ?? "Erro ao gerar kit"),
   });
@@ -146,6 +149,36 @@ function KitPublicacaoPage() {
                 </select>
               </label>
             </div>
+
+            <label className="block">
+              <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-2">
+                IMAGEM DO PROJETO (OPCIONAL)
+              </div>
+              {imagem ? (
+                <div className="flex items-center gap-3 border border-[color:var(--divisoria)] rounded-[4px] bg-white p-2 max-w-md">
+                  {imagem.signed_url && (
+                    <img src={imagem.signed_url} alt={imagem.nome_arquivo} className="h-14 w-20 object-cover rounded-[3px]" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm truncate">{imagem.projeto?.nome ?? imagem.nome_arquivo}</div>
+                    <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] uppercase">
+                      {imagem.tipo === "foto_real" ? "Foto real" : "Render"} · Linha {imagem.linha}
+                    </div>
+                  </div>
+                  <button onClick={() => setImagem(null)} className="p-1 text-[color:var(--muted-foreground)] hover:text-[color:var(--graphite)]">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm hover:border-[color:var(--bronze)]"
+                >
+                  <ImageIcon className="h-4 w-4" /> Escolher da biblioteca
+                </button>
+              )}
+            </label>
 
             <button
               disabled={!conteudo.trim() || mut.isPending}
@@ -271,6 +304,11 @@ function KitPublicacaoPage() {
           </>
         )}
       </div>
+      <BibliotecaPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(img) => { setImagem(img); setPickerOpen(false); }}
+      />
     </>
   );
 }
