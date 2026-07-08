@@ -271,6 +271,16 @@ function MotorCopy() {
               <PrimaryButton disabled={salvar.isPending} onClick={() => salvar.mutate()}>
                 {salvar.isPending ? "Salvando…" : "Salvar no calendário"}
               </PrimaryButton>
+              <SecondaryButton
+                onClick={() =>
+                  navigate({
+                    to: "/kit-publicacao",
+                    search: { conteudo: output.copy_legenda } as never,
+                  })
+                }
+              >
+                Gerar kit de publicação →
+              </SecondaryButton>
               <SecondaryButton onClick={() => copyText(output.copy_legenda)}>
                 <Copy className="h-4 w-4" /> Copiar legenda
               </SecondaryButton>
