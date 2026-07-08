@@ -15,6 +15,7 @@ import { Route as RadarRouteImport } from './routes/radar'
 import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as ObjecoesRouteImport } from './routes/objecoes'
 import { Route as MarcaRouteImport } from './routes/marca'
+import { Route as KitPublicacaoRouteImport } from './routes/kit-publicacao'
 import { Route as CustosRouteImport } from './routes/custos'
 import { Route as CopyRouteImport } from './routes/copy'
 import { Route as ConcorrentesRouteImport } from './routes/concorrentes'
@@ -51,6 +52,11 @@ const MarcaRoute = MarcaRouteImport.update({
   path: '/marca',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KitPublicacaoRoute = KitPublicacaoRouteImport.update({
+  id: '/kit-publicacao',
+  path: '/kit-publicacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CustosRoute = CustosRouteImport.update({
   id: '/custos',
   path: '/custos',
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/concorrentes': typeof ConcorrentesRoute
   '/copy': typeof CopyRoute
   '/custos': typeof CustosRoute
+  '/kit-publicacao': typeof KitPublicacaoRoute
   '/marca': typeof MarcaRoute
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/concorrentes': typeof ConcorrentesRoute
   '/copy': typeof CopyRoute
   '/custos': typeof CustosRoute
+  '/kit-publicacao': typeof KitPublicacaoRoute
   '/marca': typeof MarcaRoute
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/concorrentes': typeof ConcorrentesRoute
   '/copy': typeof CopyRoute
   '/custos': typeof CustosRoute
+  '/kit-publicacao': typeof KitPublicacaoRoute
   '/marca': typeof MarcaRoute
   '/objecoes': typeof ObjecoesRoute
   '/performance': typeof PerformanceRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/concorrentes'
     | '/copy'
     | '/custos'
+    | '/kit-publicacao'
     | '/marca'
     | '/objecoes'
     | '/performance'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/concorrentes'
     | '/copy'
     | '/custos'
+    | '/kit-publicacao'
     | '/marca'
     | '/objecoes'
     | '/performance'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/concorrentes'
     | '/copy'
     | '/custos'
+    | '/kit-publicacao'
     | '/marca'
     | '/objecoes'
     | '/performance'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   ConcorrentesRoute: typeof ConcorrentesRoute
   CopyRoute: typeof CopyRoute
   CustosRoute: typeof CustosRoute
+  KitPublicacaoRoute: typeof KitPublicacaoRoute
   MarcaRoute: typeof MarcaRoute
   ObjecoesRoute: typeof ObjecoesRoute
   PerformanceRoute: typeof PerformanceRoute
@@ -217,6 +230,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarcaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kit-publicacao': {
+      id: '/kit-publicacao'
+      path: '/kit-publicacao'
+      fullPath: '/kit-publicacao'
+      preLoaderRoute: typeof KitPublicacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/custos': {
       id: '/custos'
       path: '/custos'
@@ -261,6 +281,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConcorrentesRoute: ConcorrentesRoute,
   CopyRoute: CopyRoute,
   CustosRoute: CustosRoute,
+  KitPublicacaoRoute: KitPublicacaoRoute,
   MarcaRoute: MarcaRoute,
   ObjecoesRoute: ObjecoesRoute,
   PerformanceRoute: PerformanceRoute,

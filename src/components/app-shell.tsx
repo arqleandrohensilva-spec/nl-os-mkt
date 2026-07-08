@@ -16,12 +16,14 @@ import {
   Crosshair,
   DollarSign,
   RefreshCw,
+  Send,
 } from "lucide-react";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/copy", label: "Motor de Copy IA", icon: Sparkles },
   { to: "/reescrever", label: "Reescritor", icon: RefreshCw },
+  { to: "/kit-publicacao", label: "Kit de Publicação", icon: Send },
   { to: "/calendario", label: "Calendário Editorial", icon: Calendar },
   { to: "/objecoes", label: "Banco de Objeções", icon: Shield },
   { to: "/performance", label: "Performance", icon: BarChart3 },
