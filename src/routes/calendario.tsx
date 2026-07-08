@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { LINHAS, FORMATOS, STATUS, LINHA_BADGE } from "@/lib/nl-brand";
 import { useState, useMemo } from "react";
 import { Plus, X, AlertTriangle } from "lucide-react";
+import { signBibliotecaUrls } from "@/components/biblioteca-picker";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/calendario")({
@@ -25,7 +26,15 @@ function Calendario() {
       if (filterStatus) q = q.eq("status", filterStatus);
       const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      const rows = (data ?? []) as any[];
+      const paths = rows
+        .map((p) => (p.raciocinio && typeof p.raciocinio === "object" ? (p.raciocinio as any).imagem_path : null))
+        .filter((p): p is string => typeof p === "string" && p.length > 0);
+      const urlMap = paths.length ? await signBibliotecaUrls(paths) : {};
+      return rows.map((p) => ({
+        ...p,
+        imagem_signed_url: (p.raciocinio as any)?.imagem_path ? urlMap[(p.raciocinio as any).imagem_path] : undefined,
+      }));
     },
   });
 
@@ -119,6 +128,11 @@ function Calendario() {
                 onClick={() => setSelected(p)}
                 className="text-left border border-[color:var(--divisoria)] rounded-lg bg-white p-4 hover:border-[color:var(--bronze)] transition-colors"
               >
+                {p.imagem_signed_url && (
+                  <div className="aspect-[4/3] mb-3 rounded-[4px] overflow-hidden bg-[color:var(--gelo)]">
+                    <img src={p.imagem_signed_url} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-3">
                   <span className={`px-2 py-0.5 rounded-[4px] text-[10px] font-mono tracking-widest ${LINHA_BADGE[p.linha]}`}>
                     LINHA {p.linha}

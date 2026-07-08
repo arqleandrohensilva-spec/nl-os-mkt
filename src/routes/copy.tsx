@@ -6,7 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { gerarCopy, type CopyOutput } from "@/lib/copy.functions";
 import { PageHeader } from "@/components/page-header";
 import { LINHAS, FORMATOS } from "@/lib/nl-brand";
-import { Loader2, Copy, AlertTriangle } from "lucide-react";
+import { Loader2, Copy, AlertTriangle, Image as ImageIcon, X } from "lucide-react";
+import { BibliotecaPicker, type BibliotecaImagemLite } from "@/components/biblioteca-picker";
 import { toast } from "sonner";
 
 type Search = { dor?: string; linha?: string; formato?: string; observacao?: string };
@@ -34,6 +35,8 @@ function MotorCopy() {
   const [ajusteRaciocinio, setAjusteRaciocinio] = useState<string>("");
   const [ajustando, setAjustando] = useState(false);
   const [output, setOutput] = useState<CopyOutput | null>(null);
+  const [imagem, setImagem] = useState<BibliotecaImagemLite | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const { data: dores } = useQuery({
     queryKey: ["dores"],
@@ -71,6 +74,7 @@ function MotorCopy() {
           dor_descricao: dorSelecionada.descricao ?? undefined,
           observacao: observacao || undefined,
           ajuste_raciocinio: ajusteRaciocinio || undefined,
+          imagem_contexto: imagem?.descricao_tecnica || undefined,
         },
       });
     },
@@ -96,6 +100,8 @@ function MotorCopy() {
           formato,
           justificativa: output.justificativa_formato,
           raciocinio: output.raciocinio,
+          imagem_path: imagem?.url_storage ?? null,
+          imagem_id: imagem?.id ?? null,
         },
         copy_roteiro: output.copy_roteiro,
         copy_legenda: output.copy_legenda,
@@ -169,6 +175,32 @@ function MotorCopy() {
                 className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-[color:var(--gelo)] px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--bronze)]"
                 placeholder="Ex: enfatizar o caso do terreno em condomínio…"
               />
+            </Field>
+            <Field label="Imagem do projeto (opcional)">
+              {imagem ? (
+                <div className="flex items-center gap-3 border border-[color:var(--divisoria)] rounded-[4px] bg-white p-2">
+                  {imagem.signed_url && (
+                    <img src={imagem.signed_url} alt={imagem.nome_arquivo} className="h-14 w-20 object-cover rounded-[3px]" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm truncate">{imagem.projeto?.nome ?? imagem.nome_arquivo}</div>
+                    <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] uppercase">
+                      {imagem.tipo === "foto_real" ? "Foto real" : "Render"} · Linha {imagem.linha}
+                    </div>
+                  </div>
+                  <button onClick={() => setImagem(null)} className="p-1 text-[color:var(--muted-foreground)] hover:text-[color:var(--graphite)]">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm hover:border-[color:var(--bronze)]"
+                >
+                  <ImageIcon className="h-4 w-4" /> Escolher da biblioteca
+                </button>
+              )}
             </Field>
             <div className="pt-2">
               <PrimaryButton disabled={!dorId} onClick={() => setStep(2)}>
@@ -291,6 +323,11 @@ function MotorCopy() {
           </div>
         )}
       </div>
+      <BibliotecaPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(img) => { setImagem(img); setPickerOpen(false); }}
+      />
     </>
   );
 }
