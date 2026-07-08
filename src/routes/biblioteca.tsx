@@ -1,0 +1,1045 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
+import { PageHeader } from "@/components/page-header";
+import { analisarImagem, regenerarConteudos } from "@/lib/biblioteca.functions";
+import { signBibliotecaUrls } from "@/components/biblioteca-picker";
+import {
+  X,
+  Upload,
+  Image as ImageIcon,
+  Loader2,
+  Copy,
+  RotateCcw,
+  CheckCircle2,
+  Folder,
+  Plus,
+  Search,
+  Archive,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+
+type Search = { tab?: string; projeto?: string };
+
+export const Route = createFileRoute("/biblioteca")({
+  validateSearch: (s: Record<string, unknown>): Search => ({
+    tab: typeof s.tab === "string" ? s.tab : undefined,
+    projeto: typeof s.projeto === "string" ? s.projeto : undefined,
+  }),
+  component: BibliotecaPage,
+});
+
+const AMBIENTES = [
+  "Fachada",
+  "Sala de estar",
+  "Cozinha",
+  "Quarto",
+  "Banheiro",
+  "Área gourmet",
+  "Escritório",
+  "Fachada comercial",
+  "Outro",
+];
+
+const LINHAS = [
+  { value: "A", label: "Linha A — Residencial" },
+  { value: "B", label: "Linha B — Corporativo" },
+  { value: "AB", label: "Linha A+B" },
+  { value: "C", label: "Linha C — Consultoria" },
+];
+
+function BibliotecaPage() {
+  const search = Route.useSearch();
+  const [tab, setTab] = useState<"biblioteca" | "adicionar" | "projetos">(
+    (search.tab as any) ?? "biblioteca",
+  );
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="Biblioteca Visual"
+        title="Repositório de projetos"
+        description="Imagens tagueadas por IA e transformadas em conteúdo pronto para todos os canais."
+      />
+
+      <div className="px-4 md:px-10 py-6">
+        <div className="flex gap-1 border-b border-[color:var(--divisoria)] mb-6">
+          {[
+            { k: "biblioteca", label: "Biblioteca" },
+            { k: "adicionar", label: "Adicionar" },
+            { k: "projetos", label: "Projetos" },
+          ].map((t) => (
+            <button
+              key={t.k}
+              onClick={() => setTab(t.k as any)}
+              className={`px-4 py-2.5 text-xs font-mono tracking-widest uppercase border-b-2 -mb-px transition-colors ${
+                tab === t.k
+                  ? "border-[color:var(--bronze)] text-[color:var(--graphite)]"
+                  : "border-transparent text-[color:var(--muted-foreground)] hover:text-[color:var(--graphite)]"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "biblioteca" && <AbaBiblioteca projetoInicial={search.projeto} />}
+        {tab === "adicionar" && <AbaAdicionar onDone={() => setTab("biblioteca")} />}
+        {tab === "projetos" && <AbaProjetos onVer={() => setTab("biblioteca")} />}
+      </div>
+    </>
+  );
+}
+
+// ============================================================
+// ABA 1 — BIBLIOTECA
+// ============================================================
+function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
+  const [busca, setBusca] = useState("");
+  const [linha, setLinha] = useState("");
+  const [tipo, setTipo] = useState("");
+  const [status, setStatus] = useState("");
+  const [projetoId, setProjetoId] = useState(projetoInicial ?? "");
+  const [selecionada, setSelecionada] = useState<any | null>(null);
+
+  const { data: projetos } = useQuery({
+    queryKey: ["projetos"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("projetos").select("*").order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: imagens } = useQuery({
+    queryKey: ["biblioteca", linha, tipo, status, projetoId],
+    queryFn: async () => {
+      let q = supabase
+        .from("biblioteca_imagens")
+        .select("*, projeto:projetos(nome, linha)")
+        .order("created_at", { ascending: false });
+      if (linha) q = q.eq("linha", linha);
+      if (tipo) q = q.eq("tipo", tipo);
+      if (status) q = q.eq("status_publicacao", status);
+      if (projetoId) q = q.eq("projeto_id", projetoId);
+      const { data, error } = await q;
+      if (error) throw error;
+      const rows = (data ?? []) as any[];
+      const urlMap = await signBibliotecaUrls(rows.map((r) => r.url_storage));
+      return rows.map((r) => ({ ...r, signed_url: urlMap[r.url_storage] }));
+    },
+  });
+
+  const filtradas = useMemo(() => {
+    const arr = imagens ?? [];
+    if (!busca.trim()) return arr;
+    const b = busca.toLowerCase();
+    return arr.filter(
+      (i: any) =>
+        i.tags?.some((t: string) => t.toLowerCase().includes(b)) ||
+        i.ambiente?.toLowerCase().includes(b) ||
+        i.descricao_tecnica?.toLowerCase().includes(b) ||
+        i.nome_arquivo?.toLowerCase().includes(b),
+    );
+  }, [imagens, busca]);
+
+  const totalProjetos = new Set((imagens ?? []).map((i: any) => i.projeto_id).filter(Boolean)).size;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+          {imagens?.length ?? 0} IMAGENS · {totalProjetos} PROJETOS
+        </div>
+        <div className="flex-1 min-w-[240px] relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[color:var(--muted-foreground)]" />
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por tag, ambiente, descrição…"
+            className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-[color:var(--gelo)] pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[color:var(--bronze)]"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <FilterSel value={linha} onChange={setLinha} label="Linha">
+          <option value="">Todas</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="AB">A+B</option>
+          <option value="C">C</option>
+        </FilterSel>
+        <FilterSel value={tipo} onChange={setTipo} label="Tipo">
+          <option value="">Todos</option>
+          <option value="foto_real">Foto real</option>
+          <option value="render">Render</option>
+        </FilterSel>
+        <FilterSel value={status} onChange={setStatus} label="Status">
+          <option value="">Todos</option>
+          <option value="nao_usado">Não usado</option>
+          <option value="rascunho">Rascunho</option>
+          <option value="publicado">Publicado</option>
+        </FilterSel>
+        <FilterSel value={projetoId} onChange={setProjetoId} label="Projeto">
+          <option value="">Todos</option>
+          {(projetos ?? []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.nome}</option>
+          ))}
+        </FilterSel>
+      </div>
+
+      {filtradas.length === 0 ? (
+        <div className="border border-dashed border-[color:var(--divisoria)] rounded-lg p-10 text-center">
+          <ImageIcon className="h-8 w-8 mx-auto mb-3 text-[color:var(--muted-foreground)]" />
+          <p className="text-[color:var(--muted-foreground)]">
+            Nenhuma imagem encontrada. Comece pela aba <b>Adicionar</b>.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {filtradas.map((img: any) => (
+            <CardImagem key={img.id} img={img} onClick={() => setSelecionada(img)} />
+          ))}
+        </div>
+      )}
+
+      {selecionada && (
+        <DrawerDetalhes imagem={selecionada} onClose={() => setSelecionada(null)} />
+      )}
+    </div>
+  );
+}
+
+function CardImagem({ img, onClick }: { img: any; onClick: () => void }) {
+  const statusColor: Record<string, string> = {
+    nao_usado: "bg-[color:var(--muted-foreground)]",
+    rascunho: "bg-[color:var(--bronze)]",
+    publicado: "bg-green-600",
+  };
+  const tagsVisiveis = (img.tags ?? []).slice(0, 4);
+  const restantes = (img.tags?.length ?? 0) - tagsVisiveis.length;
+
+  return (
+    <button
+      onClick={onClick}
+      className="text-left border border-[color:var(--divisoria)] rounded-lg overflow-hidden bg-white hover:border-[color:var(--bronze)] transition-colors group"
+    >
+      <div className="aspect-[4/3] bg-[color:var(--gelo)] relative">
+        {img.signed_url ? (
+          <img src={img.signed_url} alt={img.nome_arquivo} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-[color:var(--muted-foreground)]">
+            <ImageIcon className="h-6 w-6" />
+          </div>
+        )}
+        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-[3px] text-[10px] font-mono tracking-widest bg-white/95 text-[color:var(--graphite)]">
+          LINHA {img.linha}
+        </span>
+        <span className="absolute top-2 right-2 px-2 py-0.5 rounded-[3px] text-[10px] font-mono tracking-widest bg-[color:var(--graphite)]/85 text-white">
+          {img.tipo === "foto_real" ? "FOTO REAL" : "RENDER"}
+        </span>
+        <span
+          className={`absolute bottom-2 right-2 h-3 w-3 rounded-full border-2 border-white ${statusColor[img.status_publicacao] ?? "bg-[color:var(--muted-foreground)]"}`}
+          title={img.status_publicacao}
+        />
+      </div>
+      <div className="px-3 py-3">
+        <div className="text-sm text-[color:var(--graphite)] font-serif line-clamp-1">
+          {img.projeto?.nome ?? img.nome_arquivo}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {tagsVisiveis.map((t: string) => (
+            <span
+              key={t}
+              className="text-[9px] font-mono tracking-widest uppercase px-1.5 py-0.5 rounded-[2px] bg-[color:var(--bege)] text-[color:var(--bronze)]"
+            >
+              {t}
+            </span>
+          ))}
+          {restantes > 0 && (
+            <span className="text-[9px] font-mono tracking-widest text-[color:var(--muted-foreground)]">
+              +{restantes}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function DrawerDetalhes({ imagem, onClose }: { imagem: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const regen = useServerFn(regenerarConteudos);
+  const [conteudoTab, setConteudoTab] = useState<
+    "feed" | "stories" | "reels" | "roteiro" | "carrossel" | "blog" | "email"
+  >("feed");
+
+  const regenMut = useMutation({
+    mutationFn: async () => regen({ data: { id: imagem.id } }),
+    onSuccess: () => {
+      toast.success("Conteúdos regenerados.");
+      qc.invalidateQueries({ queryKey: ["biblioteca"] });
+      onClose();
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao regenerar"),
+  });
+
+  const marcarPublicado = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("biblioteca_imagens")
+        .update({
+          status_publicacao: "publicado",
+          ultima_vez_usada: new Date().toISOString(),
+          vezes_usada: (imagem.vezes_usada ?? 0) + 1,
+        })
+        .eq("id", imagem.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Marcada como publicada.");
+      qc.invalidateQueries({ queryKey: ["biblioteca"] });
+      onClose();
+    },
+  });
+
+  const copies = imagem.copies ?? {};
+  const conteudos = imagem.conteudos_gerados ?? {};
+
+  const textoAtual = (() => {
+    switch (conteudoTab) {
+      case "feed": return copies.feed ?? "";
+      case "stories": return copies.stories ?? "";
+      case "reels": return copies.reels ?? "";
+      case "email": return copies.email ?? "";
+      case "roteiro": return conteudos.roteiro_reels ?? "";
+      case "carrossel": return conteudos.pauta_carrossel ?? "";
+      case "blog": return conteudos.texto_blog ?? "";
+    }
+  })();
+
+  const copiar = () => {
+    navigator.clipboard.writeText(textoAtual).then(
+      () => toast.success("Texto copiado."),
+      () => toast.error("Não foi possível copiar."),
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="w-full md:w-[640px] bg-white h-full overflow-y-auto border-l border-[color:var(--divisoria)]">
+        <div className="sticky top-0 bg-white z-10 border-b border-[color:var(--divisoria)] px-5 py-3 flex items-center justify-between">
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+              {imagem.tipo === "foto_real" ? "FOTO REAL" : "RENDER"} · LINHA {imagem.linha}
+            </div>
+            <div className="font-serif text-lg mt-0.5">
+              {imagem.projeto?.nome ?? imagem.nome_arquivo}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div className="aspect-video bg-[color:var(--gelo)] rounded-lg overflow-hidden">
+            {imagem.signed_url ? (
+              <img src={imagem.signed_url} alt={imagem.nome_arquivo} className="w-full h-full object-cover" />
+            ) : null}
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1">
+              DESCRIÇÃO TÉCNICA
+            </div>
+            <p className="text-sm text-[color:var(--graphite)] leading-relaxed">
+              {imagem.descricao_tecnica ?? "—"}
+            </p>
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-2">
+              TAGS
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(imagem.tags ?? []).map((t: string) => (
+                <span key={t} className="text-[10px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-[3px] bg-[color:var(--bege)] text-[color:var(--bronze)]">
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-2">
+              CONTEÚDOS DISPONÍVEIS
+            </div>
+            <div className="flex flex-wrap gap-1 mb-3">
+              {[
+                { k: "feed", l: "Feed" },
+                { k: "stories", l: "Stories" },
+                { k: "reels", l: "Reels" },
+                { k: "roteiro", l: "Roteiro" },
+                { k: "carrossel", l: "Carrossel" },
+                { k: "blog", l: "Blog" },
+                { k: "email", l: "E-mail" },
+              ].map((t) => (
+                <button
+                  key={t.k}
+                  onClick={() => setConteudoTab(t.k as any)}
+                  className={`px-2.5 py-1 text-[10px] font-mono tracking-widest uppercase rounded-[3px] border transition-colors ${
+                    conteudoTab === t.k
+                      ? "bg-[color:var(--graphite)] text-white border-[color:var(--graphite)]"
+                      : "bg-white text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                  }`}
+                >
+                  {t.l}
+                </button>
+              ))}
+            </div>
+            <div className="border border-[color:var(--divisoria)] rounded-lg bg-white p-4 text-sm whitespace-pre-wrap min-h-[100px] leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>
+              {textoAtual || "—"}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button onClick={copiar} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]">
+                <Copy className="h-3 w-3" /> Copiar
+              </button>
+            </div>
+          </div>
+
+          {conteudos.sugestoes_valorizacao && conteudos.sugestoes_valorizacao.length > 0 && (
+            <div>
+              <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-2">
+                SUGESTÕES DE VALORIZAÇÃO
+              </div>
+              <ul className="space-y-1.5 text-sm">
+                {conteudos.sugestoes_valorizacao.map((s: string, i: number) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-[color:var(--bronze)]">·</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2 text-xs text-[color:var(--muted-foreground)] border-t border-[color:var(--divisoria)]">
+            <span>Usada {imagem.vezes_usada ?? 0} vez(es)</span>
+            <span>Status: {imagem.status_publicacao}</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => marcarPublicado.mutate()}
+              disabled={marcarPublicado.isPending || imagem.status_publicacao === "publicado"}
+              className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-4 py-2 text-xs text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40"
+            >
+              <CheckCircle2 className="h-4 w-4" /> Marcar como publicado
+            </button>
+            <button
+              onClick={() => regenMut.mutate()}
+              disabled={regenMut.isPending}
+              className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-4 py-2 text-xs hover:border-[color:var(--bronze)]"
+            >
+              {regenMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              Regenerar conteúdos
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ABA 2 — ADICIONAR
+// ============================================================
+function AbaAdicionar({ onDone }: { onDone: () => void }) {
+  const [modo, setModo] = useState<"individual" | "lote">("individual");
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-1">
+        {[
+          { k: "individual", l: "Individual" },
+          { k: "lote", l: "Lote" },
+        ].map((m) => (
+          <button
+            key={m.k}
+            onClick={() => setModo(m.k as any)}
+            className={`px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase rounded-[3px] border transition-colors ${
+              modo === m.k
+                ? "bg-[color:var(--graphite)] text-white border-[color:var(--graphite)]"
+                : "bg-white text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+            }`}
+          >
+            {m.l}
+          </button>
+        ))}
+      </div>
+
+      {modo === "individual" ? <UploadIndividual onDone={onDone} /> : <UploadLote onDone={onDone} />}
+    </div>
+  );
+}
+
+function useProjetos() {
+  return useQuery({
+    queryKey: ["projetos"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("projetos").select("*").order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+async function fileToBase64(file: File): Promise<{ base64: string; media_type: string }> {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < buf.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, Array.from(buf.subarray(i, i + chunk)));
+  }
+  return { base64: btoa(binary), media_type: file.type || "image/jpeg" };
+}
+
+async function uploadParaStorage(file: File): Promise<string> {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("biblioteca-visual")
+    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+  if (error) throw new Error(`Falha no upload: ${error.message}`);
+  return path;
+}
+
+function UploadIndividual({ onDone }: { onDone: () => void }) {
+  const analisar = useServerFn(analisarImagem);
+  const qc = useQueryClient();
+  const { data: projetos } = useProjetos();
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [projetoId, setProjetoId] = useState<string>("");
+  const [tipo, setTipo] = useState<"foto_real" | "render">("foto_real");
+  const [linha, setLinha] = useState("A");
+  const [ambiente, setAmbiente] = useState("Fachada");
+  const [novoModal, setNovoModal] = useState(false);
+
+  useEffect(() => {
+    if (!file) { setPreviewUrl(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const mut = useMutation({
+    mutationFn: async () => {
+      if (!file) throw new Error("Selecione uma imagem");
+      const path = await uploadParaStorage(file);
+      const { base64, media_type } = await fileToBase64(file);
+      return analisar({
+        data: {
+          base64,
+          media_type,
+          nome_arquivo: file.name,
+          url_storage: path,
+          tipo,
+          linha,
+          ambiente,
+          projeto_id: projetoId || null,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Imagem analisada e salva.");
+      qc.invalidateQueries({ queryKey: ["biblioteca"] });
+      qc.invalidateQueries({ queryKey: ["projetos"] });
+      onDone();
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao analisar"),
+  });
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <DropZone file={file} previewUrl={previewUrl} onFile={setFile} multiple={false} />
+
+      <Field label="Projeto">
+        <div className="flex gap-2">
+          <select
+            value={projetoId}
+            onChange={(e) => setProjetoId(e.target.value)}
+            className="flex-1 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm"
+          >
+            <option value="">— Sem projeto —</option>
+            {(projetos ?? []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.nome} (L.{p.linha})</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setNovoModal(true)}
+            className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+          >
+            <Plus className="h-3.5 w-3.5" /> Novo
+          </button>
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Field label="Tipo">
+          <select value={tipo} onChange={(e) => setTipo(e.target.value as any)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+            <option value="foto_real">Foto real</option>
+            <option value="render">Render</option>
+          </select>
+        </Field>
+        <Field label="Linha">
+          <select value={linha} onChange={(e) => setLinha(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+            {LINHAS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+          </select>
+        </Field>
+        <Field label="Ambiente">
+          <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+            {AMBIENTES.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </Field>
+      </div>
+
+      <button
+        onClick={() => mut.mutate()}
+        disabled={!file || mut.isPending}
+        className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-5 py-2.5 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40"
+      >
+        {mut.isPending ? (
+          <><Loader2 className="h-4 w-4 animate-spin" /> Analisando…</>
+        ) : (
+          <>Analisar e salvar</>
+        )}
+      </button>
+
+      {novoModal && <ProjetoModal onClose={() => setNovoModal(false)} onCreated={(p) => { setProjetoId(p.id); setNovoModal(false); }} />}
+    </div>
+  );
+}
+
+function UploadLote({ onDone }: { onDone: () => void }) {
+  const analisar = useServerFn(analisarImagem);
+  const qc = useQueryClient();
+  const { data: projetos } = useProjetos();
+  const [files, setFiles] = useState<File[]>([]);
+  const [projetoId, setProjetoId] = useState("");
+  const [tipo, setTipo] = useState<"foto_real" | "render">("foto_real");
+  const [linha, setLinha] = useState("A");
+  const [ambiente, setAmbiente] = useState("Fachada");
+  const [progresso, setProgresso] = useState<{ i: number; total: number } | null>(null);
+  const [novoModal, setNovoModal] = useState(false);
+
+  const addFiles = (list: FileList | File[]) => {
+    const arr = Array.from(list).slice(0, 20 - files.length);
+    setFiles((prev) => [...prev, ...arr].slice(0, 20));
+  };
+
+  const remover = (i: number) => setFiles((f) => f.filter((_, idx) => idx !== i));
+
+  const rodar = async () => {
+    if (files.length === 0) return;
+    setProgresso({ i: 0, total: files.length });
+    try {
+      for (let i = 0; i < files.length; i++) {
+        setProgresso({ i: i + 1, total: files.length });
+        const f = files[i];
+        const path = await uploadParaStorage(f);
+        const { base64, media_type } = await fileToBase64(f);
+        await analisar({
+          data: {
+            base64,
+            media_type,
+            nome_arquivo: f.name,
+            url_storage: path,
+            tipo,
+            linha,
+            ambiente,
+            projeto_id: projetoId || null,
+          },
+        });
+      }
+      toast.success(`${files.length} imagens analisadas.`);
+      qc.invalidateQueries({ queryKey: ["biblioteca"] });
+      qc.invalidateQueries({ queryKey: ["projetos"] });
+      onDone();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro no lote");
+    } finally {
+      setProgresso(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="md:col-span-2">
+          <Field label="Projeto">
+            <div className="flex gap-2">
+              <select value={projetoId} onChange={(e) => setProjetoId(e.target.value)} className="flex-1 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+                <option value="">— Sem projeto —</option>
+                {(projetos ?? []).map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.nome}</option>
+                ))}
+              </select>
+              <button type="button" onClick={() => setNovoModal(true)} className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]">
+                <Plus className="h-3.5 w-3.5" /> Novo
+              </button>
+            </div>
+          </Field>
+        </div>
+        <Field label="Tipo">
+          <select value={tipo} onChange={(e) => setTipo(e.target.value as any)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+            <option value="foto_real">Foto real</option>
+            <option value="render">Render</option>
+          </select>
+        </Field>
+        <Field label="Linha">
+          <select value={linha} onChange={(e) => setLinha(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+            {LINHAS.map((l) => <option key={l.value} value={l.value}>{l.value}</option>)}
+          </select>
+        </Field>
+      </div>
+
+      <Field label="Ambiente (aplicado a todas)">
+        <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)} className="w-full max-w-xs rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+          {AMBIENTES.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </Field>
+
+      <DropZone multiple onFiles={addFiles} disabled={files.length >= 20} />
+
+      {files.length > 0 && (
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+          {files.map((f, i) => (
+            <div key={i} className="relative aspect-square border border-[color:var(--divisoria)] rounded-[4px] overflow-hidden bg-[color:var(--gelo)]">
+              <img src={URL.createObjectURL(f)} alt={f.name} className="w-full h-full object-cover" />
+              <button
+                onClick={() => remover(i)}
+                className="absolute top-1 right-1 bg-white/95 rounded-full p-0.5 text-[color:var(--graphite)] hover:text-red-600"
+                disabled={!!progresso}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {progresso && (
+        <div>
+          <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1">
+            ANALISANDO IMAGEM {progresso.i} DE {progresso.total}…
+          </div>
+          <div className="h-1.5 bg-[color:var(--divisoria)] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[color:var(--bronze)] transition-all"
+              style={{ width: `${(progresso.i / progresso.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={rodar}
+        disabled={files.length === 0 || !!progresso}
+        className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-5 py-2.5 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40"
+      >
+        {progresso ? (
+          <><Loader2 className="h-4 w-4 animate-spin" /> Processando…</>
+        ) : (
+          <>Analisar e salvar todas ({files.length})</>
+        )}
+      </button>
+
+      {novoModal && <ProjetoModal onClose={() => setNovoModal(false)} onCreated={(p) => { setProjetoId(p.id); setNovoModal(false); }} />}
+    </div>
+  );
+}
+
+function DropZone({
+  file,
+  previewUrl,
+  onFile,
+  onFiles,
+  multiple,
+  disabled,
+}: {
+  file?: File | null;
+  previewUrl?: string | null;
+  onFile?: (f: File) => void;
+  onFiles?: (fs: FileList | File[]) => void;
+  multiple?: boolean;
+  disabled?: boolean;
+}) {
+  const [drag, setDrag] = useState(false);
+
+  const handle = (list: FileList | null) => {
+    if (!list || list.length === 0 || disabled) return;
+    if (multiple && onFiles) onFiles(list);
+    else if (onFile) onFile(list[0]);
+  };
+
+  return (
+    <label
+      onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files); }}
+      className={`block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+        drag ? "border-[color:var(--bronze)] bg-[color:var(--bege)]" : "border-[color:var(--divisoria)] bg-[color:var(--gelo)] hover:border-[color:var(--bronze)]"
+      } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+    >
+      <input
+        type="file"
+        accept="image/*"
+        multiple={multiple}
+        className="hidden"
+        disabled={disabled}
+        onChange={(e) => handle(e.target.files)}
+      />
+      {previewUrl && file ? (
+        <div className="flex flex-col items-center gap-2">
+          <img src={previewUrl} alt="preview" className="max-h-48 rounded" />
+          <div className="text-xs text-[color:var(--muted-foreground)]">{file.name}</div>
+          <div className="text-[10px] font-mono tracking-widest text-[color:var(--bronze)]">TROCAR IMAGEM</div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-2 text-[color:var(--muted-foreground)]">
+          <Upload className="h-6 w-6" />
+          <div className="text-sm">
+            {multiple ? "Arraste imagens ou clique para selecionar (até 20)" : "Arraste uma imagem ou clique para selecionar"}
+          </div>
+        </div>
+      )}
+    </label>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-2 uppercase">
+        {label}
+      </div>
+      {children}
+    </label>
+  );
+}
+
+function FilterSel({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="font-mono text-[9px] tracking-widest text-[color:var(--bronze)] mb-1 uppercase">{label}</div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-[4px] border border-[color:var(--divisoria)] bg-[color:var(--gelo)] px-3 py-1.5 text-sm"
+      >
+        {children}
+      </select>
+    </div>
+  );
+}
+
+// ============================================================
+// ABA 3 — PROJETOS
+// ============================================================
+function AbaProjetos({ onVer }: { onVer: () => void }) {
+  const qc = useQueryClient();
+  const [novoModal, setNovoModal] = useState(false);
+  const [editando, setEditando] = useState<any | null>(null);
+
+  const { data: projetos } = useQuery({
+    queryKey: ["projetos-detalhe"],
+    queryFn: async () => {
+      const { data: ps } = await supabase.from("projetos").select("*").order("nome");
+      const { data: imgs } = await supabase.from("biblioteca_imagens").select("projeto_id");
+      const counts = new Map<string, number>();
+      (imgs ?? []).forEach((i: any) => {
+        if (!i.projeto_id) return;
+        counts.set(i.projeto_id, (counts.get(i.projeto_id) ?? 0) + 1);
+      });
+      return (ps ?? []).map((p: any) => ({ ...p, count: counts.get(p.id) ?? 0 }));
+    },
+  });
+
+  const arquivar = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("projetos").update({ status: "arquivado" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Projeto arquivado.");
+      qc.invalidateQueries({ queryKey: ["projetos-detalhe"] });
+      qc.invalidateQueries({ queryKey: ["projetos"] });
+    },
+  });
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+          {projetos?.length ?? 0} PROJETOS
+        </div>
+        <button
+          onClick={() => setNovoModal(true)}
+          className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-4 py-2 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors"
+        >
+          <Plus className="h-4 w-4" /> Novo projeto
+        </button>
+      </div>
+
+      {(projetos?.length ?? 0) === 0 ? (
+        <div className="border border-dashed border-[color:var(--divisoria)] rounded-lg p-10 text-center">
+          <Folder className="h-8 w-8 mx-auto mb-2 text-[color:var(--muted-foreground)]" />
+          <p className="text-[color:var(--muted-foreground)]">Ainda sem projetos.</p>
+        </div>
+      ) : (
+        <div className="border border-[color:var(--divisoria)] rounded-lg bg-white overflow-hidden">
+          {(projetos ?? []).map((p: any) => (
+            <div key={p.id} className={`flex items-center justify-between px-4 py-3 border-b border-[color:var(--divisoria)] last:border-b-0 ${p.status === "arquivado" ? "opacity-50" : ""}`}>
+              <div className="min-w-0">
+                <div className="font-serif text-base text-[color:var(--graphite)] truncate">{p.nome}</div>
+                <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] uppercase mt-0.5">
+                  Linha {p.linha} · {p.count} imagens {p.status === "arquivado" && "· ARQUIVADO"}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onVer()}
+                  className="text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                >
+                  Ver imagens
+                </button>
+                <button
+                  onClick={() => setEditando(p)}
+                  className="text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                >
+                  Editar
+                </button>
+                {p.status !== "arquivado" && (
+                  <button
+                    onClick={() => arquivar.mutate(p.id)}
+                    className="text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)] inline-flex items-center gap-1"
+                  >
+                    <Archive className="h-3 w-3" /> Arquivar
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {novoModal && <ProjetoModal onClose={() => setNovoModal(false)} onCreated={() => setNovoModal(false)} />}
+      {editando && <ProjetoModal projeto={editando} onClose={() => setEditando(null)} onCreated={() => setEditando(null)} />}
+    </div>
+  );
+}
+
+function ProjetoModal({
+  projeto,
+  onClose,
+  onCreated,
+}: {
+  projeto?: any;
+  onClose: () => void;
+  onCreated: (p: any) => void;
+}) {
+  const qc = useQueryClient();
+  const [nome, setNome] = useState(projeto?.nome ?? "");
+  const [linha, setLinha] = useState(projeto?.linha ?? "A");
+  const [descricao, setDescricao] = useState(projeto?.descricao ?? "");
+
+  const salvar = useMutation({
+    mutationFn: async () => {
+      if (!nome.trim()) throw new Error("Nome obrigatório");
+      if (projeto) {
+        const { data, error } = await supabase
+          .from("projetos")
+          .update({ nome, linha, descricao: descricao || null })
+          .eq("id", projeto.id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from("projetos")
+          .insert({ nome, linha, descricao: descricao || null })
+          .select("*")
+          .single();
+        if (error) throw error;
+        return data;
+      }
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["projetos"] });
+      qc.invalidateQueries({ queryKey: ["projetos-detalhe"] });
+      toast.success(projeto ? "Projeto atualizado." : "Projeto criado.");
+      onCreated(data);
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro"),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className="w-full max-w-md bg-white rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[color:var(--divisoria)] flex items-center justify-between">
+          <div className="font-serif text-lg">{projeto ? "Editar projeto" : "Novo projeto"}</div>
+          <button onClick={onClose}><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <Field label="Nome">
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-[color:var(--gelo)] px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--bronze)]"
+            />
+          </Field>
+          <Field label="Linha de negócio">
+            <select
+              value={linha}
+              onChange={(e) => setLinha(e.target.value)}
+              className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm"
+            >
+              {LINHAS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Descrição">
+            <textarea
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              rows={3}
+              className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-[color:var(--gelo)] px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--bronze)]"
+            />
+          </Field>
+          <button
+            onClick={() => salvar.mutate()}
+            disabled={salvar.isPending}
+            className="w-full rounded-[4px] bg-[color:var(--graphite)] px-4 py-2.5 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40"
+          >
+            {salvar.isPending ? "Salvando…" : projeto ? "Salvar alterações" : "Criar projeto"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
