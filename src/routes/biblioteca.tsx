@@ -305,25 +305,6 @@ function DrawerDetalhes({ imagem, onClose }: { imagem: any; onClose: () => void 
     onError: (err: any) => toast.error(err?.message ?? "Erro ao regenerar"),
   });
 
-  const marcarPublicado = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("biblioteca_imagens")
-        .update({
-          status_publicacao: "publicado",
-          ultima_vez_usada: new Date().toISOString(),
-          vezes_usada: (imagem.vezes_usada ?? 0) + 1,
-        })
-        .eq("id", imagem.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Marcada como publicada.");
-      qc.invalidateQueries({ queryKey: ["biblioteca"] });
-      onClose();
-    },
-  });
-
   const copies = imagem.copies ?? {};
   const conteudos = imagem.conteudos_gerados ?? {};
 
@@ -444,19 +425,14 @@ function DrawerDetalhes({ imagem, onClose }: { imagem: any; onClose: () => void 
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-2 text-xs text-[color:var(--muted-foreground)] border-t border-[color:var(--divisoria)]">
-            <span>Usada {imagem.vezes_usada ?? 0} vez(es)</span>
-            <span>Status: {imagem.status_publicacao}</span>
-          </div>
+          <StatusCanaisPanel
+            tabela="biblioteca_imagens"
+            id={imagem.id}
+            status={imagem.status_canais}
+            queryKey={["biblioteca"]}
+          />
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => marcarPublicado.mutate()}
-              disabled={marcarPublicado.isPending || imagem.status_publicacao === "publicado"}
-              className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-4 py-2 text-xs text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40"
-            >
-              <CheckCircle2 className="h-4 w-4" /> Marcar como publicado
-            </button>
             <button
               onClick={() => regenMut.mutate()}
               disabled={regenMut.isPending}
