@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { LINHAS, FORMATOS } from "@/lib/nl-brand";
 import { Loader2, Copy, AlertTriangle, Image as ImageIcon, X } from "lucide-react";
 import { BibliotecaPicker, type BibliotecaImagemLite } from "@/components/biblioteca-picker";
+import { BufferButton } from "@/components/buffer-modal";
 import { toast } from "sonner";
 
 type Search = { dor?: string; linha?: string; formato?: string; observacao?: string };
