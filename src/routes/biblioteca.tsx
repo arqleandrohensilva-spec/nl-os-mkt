@@ -1037,3 +1037,446 @@ function ProjetoModal({
     </div>
   );
 }
+
+// ============================================================
+// STATUS DE PUBLICAÇÃO POR CANAL
+// ============================================================
+function StatusCanaisPanel({
+  tabela,
+  id,
+  status,
+  queryKey,
+}: {
+  tabela: "biblioteca_imagens" | "antes_depois";
+  id: string;
+  status: any;
+  queryKey: string[];
+}) {
+  const qc = useQueryClient();
+  const atual = useMemo(() => {
+    const base: Record<string, boolean> = {};
+    CANAIS.forEach((c) => (base[c.k] = !!status?.[c.k]));
+    return base;
+  }, [status]);
+
+  const toggle = useMutation({
+    mutationFn: async (canal: string) => {
+      const novo = { ...atual, [canal]: !atual[canal] };
+      const col = tabela === "biblioteca_imagens" ? "status_canais" : "status_publicacao";
+      const { error } = await supabase
+        .from(tabela)
+        .update({ [col]: novo as never })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao atualizar status"),
+  });
+
+  const publicados = CANAIS.reduce((n, c) => (atual[c.k] ? n + 1 : n), 0);
+
+  return (
+    <div className="border-t border-[color:var(--divisoria)] pt-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+          STATUS DE PUBLICAÇÃO
+        </div>
+        <div className="text-[10px] font-mono tracking-widest text-[color:var(--muted-foreground)]">
+          {publicados}/{CANAIS.length}
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {CANAIS.map((c) => {
+          const on = atual[c.k];
+          return (
+            <button
+              key={c.k}
+              onClick={() => toggle.mutate(c.k)}
+              disabled={toggle.isPending}
+              className={`px-2.5 py-1.5 text-[10px] font-mono tracking-widest uppercase rounded-[3px] border transition-colors ${
+                on
+                  ? "bg-green-600 text-white border-green-600"
+                  : "bg-white text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+              }`}
+            >
+              {on ? "✓ " : "○ "}
+              {c.l}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ABA — ANTES E DEPOIS
+// ============================================================
+function AbaAntesDepois() {
+  const [novo, setNovo] = useState(false);
+  const [selecionado, setSelecionado] = useState<any | null>(null);
+
+  const { data } = useQuery({
+    queryKey: ["antes-depois"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("antes_depois")
+        .select(
+          "*, projeto:projetos(nome), antes:biblioteca_imagens!antes_depois_imagem_antes_id_fkey(id, url_storage, nome_arquivo), depois:biblioteca_imagens!antes_depois_imagem_depois_id_fkey(id, url_storage, nome_arquivo)",
+        )
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const rows = (data ?? []) as any[];
+      const paths = rows.flatMap((r) => [r.antes?.url_storage, r.depois?.url_storage].filter(Boolean));
+      const map = await signBibliotecaUrls(paths);
+      return rows.map((r) => ({
+        ...r,
+        antes_url: r.antes?.url_storage ? map[r.antes.url_storage] : null,
+        depois_url: r.depois?.url_storage ? map[r.depois.url_storage] : null,
+      }));
+    },
+  });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+          {data?.length ?? 0} COMPARATIVOS
+        </div>
+        <button
+          onClick={() => setNovo(true)}
+          className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-4 py-2 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors"
+        >
+          <Plus className="h-4 w-4" /> Novo comparativo
+        </button>
+      </div>
+
+      {(data?.length ?? 0) === 0 ? (
+        <div className="border border-dashed border-[color:var(--divisoria)] rounded-lg p-10 text-center">
+          <ArrowLeftRight className="h-8 w-8 mx-auto mb-3 text-[color:var(--muted-foreground)]" />
+          <p className="text-[color:var(--muted-foreground)]">
+            Ainda sem comparativos. Crie o primeiro com duas imagens da biblioteca.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(data ?? []).map((c: any) => (
+            <button
+              key={c.id}
+              onClick={() => setSelecionado(c)}
+              className="text-left border border-[color:var(--divisoria)] rounded-lg overflow-hidden bg-white hover:border-[color:var(--bronze)] transition-colors"
+            >
+              <div className="grid grid-cols-2 gap-px bg-[color:var(--divisoria)]">
+                <div className="aspect-[4/3] bg-[color:var(--gelo)] relative">
+                  {c.antes_url ? (
+                    <img src={c.antes_url} alt="antes" className="w-full h-full object-cover" />
+                  ) : null}
+                  <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono tracking-widest bg-white/90 uppercase text-[color:var(--bronze)]" style={{ fontFamily: "Courier New, monospace" }}>
+                    ANTES
+                  </span>
+                </div>
+                <div className="aspect-[4/3] bg-[color:var(--gelo)] relative">
+                  {c.depois_url ? (
+                    <img src={c.depois_url} alt="depois" className="w-full h-full object-cover" />
+                  ) : null}
+                  <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono tracking-widest bg-white/90 uppercase text-[color:var(--bronze)]" style={{ fontFamily: "Courier New, monospace" }}>
+                    DEPOIS
+                  </span>
+                </div>
+              </div>
+              <div className="px-3 py-3">
+                <div className="font-serif text-base text-[color:var(--graphite)] line-clamp-1">{c.nome}</div>
+                <div className="mt-0.5 font-mono text-[10px] tracking-widest text-[color:var(--bronze)] uppercase">
+                  {c.projeto?.nome ?? "Sem projeto"} · Linha {c.linha}
+                  {c.ambiente ? ` · ${c.ambiente}` : ""}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {CANAIS.map((canal) => {
+                    const on = !!c.status_publicacao?.[canal.k];
+                    return (
+                      <span
+                        key={canal.k}
+                        className={`text-[9px] font-mono tracking-widest uppercase px-1.5 py-0.5 rounded-[2px] ${
+                          on ? "bg-green-600 text-white" : "bg-[color:var(--gelo)] text-[color:var(--muted-foreground)]"
+                        }`}
+                      >
+                        {canal.l}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {novo && <NovoComparativoModal onClose={() => setNovo(false)} />}
+      {selecionado && (
+        <DrawerAntesDepois comparativo={selecionado} onClose={() => setSelecionado(null)} />
+      )}
+    </div>
+  );
+}
+
+function NovoComparativoModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const gerar = useServerFn(gerarAntesDepois);
+  const { data: projetos } = useProjetos();
+  const [nome, setNome] = useState("");
+  const [projetoId, setProjetoId] = useState("");
+  const [linha, setLinha] = useState("A");
+  const [ambiente, setAmbiente] = useState("Sala de estar");
+  const [antes, setAntes] = useState<BibliotecaImagemLite | null>(null);
+  const [depois, setDepois] = useState<BibliotecaImagemLite | null>(null);
+  const [pickerAlvo, setPickerAlvo] = useState<"antes" | "depois" | null>(null);
+
+  async function pathToBase64(path: string): Promise<{ base64: string; media_type: string }> {
+    const { data, error } = await supabase.storage.from("biblioteca-visual").download(path);
+    if (error || !data) throw new Error("Falha ao baixar imagem da biblioteca.");
+    const buf = new Uint8Array(await data.arrayBuffer());
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < buf.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, Array.from(buf.subarray(i, i + chunk)));
+    }
+    return { base64: btoa(binary), media_type: data.type || "image/jpeg" };
+  }
+
+  const mut = useMutation({
+    mutationFn: async () => {
+      if (!nome.trim()) throw new Error("Dê um nome ao comparativo.");
+      if (!antes || !depois) throw new Error("Escolha as duas imagens.");
+      const a = await pathToBase64(antes.url_storage);
+      const d = await pathToBase64(depois.url_storage);
+      return gerar({
+        data: {
+          nome,
+          linha,
+          ambiente,
+          projeto_id: projetoId || null,
+          imagem_antes_id: antes.id,
+          imagem_depois_id: depois.id,
+          antes_base64: a.base64,
+          antes_media_type: a.media_type,
+          depois_base64: d.base64,
+          depois_media_type: d.media_type,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Comparativo criado.");
+      qc.invalidateQueries({ queryKey: ["antes-depois"] });
+      onClose();
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao gerar comparativo"),
+  });
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className="w-full max-w-2xl bg-white rounded-lg overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[color:var(--divisoria)] flex items-center justify-between">
+          <div className="font-serif text-lg">Novo comparativo</div>
+          <button onClick={onClose}><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-5 space-y-4 overflow-y-auto">
+          <Field label="Nome do comparativo">
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Ex: Sala de estar — Vila Maria"
+              className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-[color:var(--gelo)] px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--bronze)]"
+            />
+          </Field>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Field label="Projeto">
+              <select value={projetoId} onChange={(e) => setProjetoId(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+                <option value="">— Sem projeto —</option>
+                {(projetos ?? []).map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.nome}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Linha">
+              <select value={linha} onChange={(e) => setLinha(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+                {LINHAS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Ambiente">
+              <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+                {AMBIENTES.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {(["antes", "depois"] as const).map((slot) => {
+              const img = slot === "antes" ? antes : depois;
+              return (
+                <div key={slot}>
+                  <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1 uppercase" style={{ fontFamily: "Courier New, monospace" }}>
+                    IMAGEM {slot}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPickerAlvo(slot)}
+                    className="w-full aspect-[4/3] border border-dashed border-[color:var(--divisoria)] rounded-[4px] bg-[color:var(--gelo)] hover:border-[color:var(--bronze)] flex items-center justify-center overflow-hidden"
+                  >
+                    {img?.signed_url ? (
+                      <img src={img.signed_url} alt={slot} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-[color:var(--muted-foreground)] text-xs">Escolher da biblioteca</div>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => mut.mutate()}
+            disabled={mut.isPending}
+            className="w-full rounded-[4px] bg-[color:var(--graphite)] px-4 py-2.5 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40 inline-flex items-center justify-center gap-2"
+          >
+            {mut.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando…</> : <>Gerar conteúdos de transformação</>}
+          </button>
+        </div>
+
+        <BibliotecaPicker
+          open={pickerAlvo !== null}
+          onClose={() => setPickerAlvo(null)}
+          onSelect={(img) => {
+            if (pickerAlvo === "antes") setAntes(img);
+            if (pickerAlvo === "depois") setDepois(img);
+            setPickerAlvo(null);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DrawerAntesDepois({ comparativo, onClose }: { comparativo: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const regen = useServerFn(regenerarAntesDepois);
+  const [aba, setAba] = useState<
+    "feed" | "stories" | "reels" | "roteiro_reels" | "carrossel" | "blog" | "email"
+  >("feed");
+
+  const regenMut = useMutation({
+    mutationFn: async () => regen({ data: { id: comparativo.id } }),
+    onSuccess: () => {
+      toast.success("Conteúdos regenerados.");
+      qc.invalidateQueries({ queryKey: ["antes-depois"] });
+      onClose();
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao regenerar"),
+  });
+
+  const conteudos = comparativo.conteudos ?? {};
+  const textoAtual = conteudos[aba] ?? "";
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="w-full md:w-[720px] bg-white h-full overflow-y-auto border-l border-[color:var(--divisoria)]">
+        <div className="sticky top-0 bg-white z-10 border-b border-[color:var(--divisoria)] px-5 py-3 flex items-center justify-between">
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+              ANTES E DEPOIS · LINHA {comparativo.linha}
+            </div>
+            <div className="font-serif text-lg mt-0.5">{comparativo.nome}</div>
+          </div>
+          <button onClick={onClose} className="p-1"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-5 space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { url: comparativo.antes_url, label: "ANTES" },
+              { url: comparativo.depois_url, label: "DEPOIS" },
+            ].map((slot) => (
+              <div key={slot.label} className="relative aspect-[4/3] bg-[color:var(--gelo)] rounded-lg overflow-hidden">
+                {slot.url ? <img src={slot.url} alt={slot.label} className="w-full h-full object-cover" /> : null}
+                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-[3px] text-[10px] tracking-widest bg-white/95 uppercase text-[color:var(--bronze)]" style={{ fontFamily: "Courier New, monospace" }}>
+                  {slot.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1">
+              DESCRIÇÃO DA TRANSFORMAÇÃO
+            </div>
+            <p className="text-sm text-[color:var(--graphite)] leading-relaxed">
+              {comparativo.descricao_transformacao ?? "—"}
+            </p>
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-2">
+              CONTEÚDOS
+            </div>
+            <div className="flex flex-wrap gap-1 mb-3">
+              {[
+                { k: "feed", l: "Feed" },
+                { k: "stories", l: "Stories" },
+                { k: "reels", l: "Reels" },
+                { k: "roteiro_reels", l: "Roteiro" },
+                { k: "carrossel", l: "Carrossel" },
+                { k: "blog", l: "Blog" },
+                { k: "email", l: "E-mail" },
+              ].map((t) => (
+                <button
+                  key={t.k}
+                  onClick={() => setAba(t.k as any)}
+                  className={`px-2.5 py-1 text-[10px] font-mono tracking-widest uppercase rounded-[3px] border transition-colors ${
+                    aba === t.k
+                      ? "bg-[color:var(--graphite)] text-white border-[color:var(--graphite)]"
+                      : "bg-white text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                  }`}
+                >
+                  {t.l}
+                </button>
+              ))}
+            </div>
+            <div className="border border-[color:var(--divisoria)] rounded-lg bg-white p-4 text-sm whitespace-pre-wrap min-h-[120px] leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>
+              {textoAtual || "—"}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(textoAtual).then(
+                    () => toast.success("Texto copiado."),
+                    () => toast.error("Não foi possível copiar."),
+                  );
+                }}
+                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+              >
+                <Copy className="h-3 w-3" /> Copiar
+              </button>
+            </div>
+          </div>
+
+          <StatusCanaisPanel
+            tabela="antes_depois"
+            id={comparativo.id}
+            status={comparativo.status_publicacao}
+            queryKey={["antes-depois"]}
+          />
+
+          <div>
+            <button
+              onClick={() => regenMut.mutate()}
+              disabled={regenMut.isPending}
+              className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-4 py-2 text-xs hover:border-[color:var(--bronze)]"
+            >
+              {regenMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              Regenerar conteúdos
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
