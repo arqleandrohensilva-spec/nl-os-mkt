@@ -5,6 +5,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { analisarImagem, regenerarConteudos } from "@/lib/biblioteca.functions";
+import {
+  gerarAntesDepois,
+  regenerarAntesDepois,
+  gerarNarrativaProjeto,
+} from "@/lib/antes-depois.functions";
 import { signBibliotecaUrls } from "@/components/biblioteca-picker";
 import {
   X,
@@ -13,12 +18,12 @@ import {
   Loader2,
   Copy,
   RotateCcw,
-  CheckCircle2,
   Folder,
   Plus,
   Search,
   Archive,
-  Trash2,
+  Sparkles,
+  ArrowLeftRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,7 +58,7 @@ const LINHAS = [
 
 function BibliotecaPage() {
   const search = Route.useSearch();
-  const [tab, setTab] = useState<"biblioteca" | "adicionar" | "projetos">(
+  const [tab, setTab] = useState<"biblioteca" | "adicionar" | "antes_depois" | "projetos">(
     (search.tab as any) ?? "biblioteca",
   );
 
@@ -70,6 +75,7 @@ function BibliotecaPage() {
           {[
             { k: "biblioteca", label: "Biblioteca" },
             { k: "adicionar", label: "Adicionar" },
+            { k: "antes_depois", label: "Antes e Depois" },
             { k: "projetos", label: "Projetos" },
           ].map((t) => (
             <button
@@ -88,6 +94,7 @@ function BibliotecaPage() {
 
         {tab === "biblioteca" && <AbaBiblioteca projetoInicial={search.projeto} />}
         {tab === "adicionar" && <AbaAdicionar onDone={() => setTab("biblioteca")} />}
+        {tab === "antes_depois" && <AbaAntesDepois />}
         {tab === "projetos" && <AbaProjetos onVer={() => setTab("biblioteca")} />}
       </div>
     </>
