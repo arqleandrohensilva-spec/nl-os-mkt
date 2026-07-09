@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { LINHAS } from "@/lib/nl-brand";
 import { gerarEstudoCaso, type EstudoCasoOutput } from "@/lib/estudos.functions";
 import { BibliotecaPicker, signBibliotecaUrls, type BibliotecaImagemLite } from "@/components/biblioteca-picker";
+import { BufferButton } from "@/components/buffer-modal";
 import { toast } from "sonner";
 import {
   Loader2,
