@@ -213,14 +213,24 @@ function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
   );
 }
 
+const CANAIS = [
+  { k: "feed", l: "Feed" },
+  { k: "stories", l: "Stories" },
+  { k: "reels", l: "Reels" },
+  { k: "carrossel", l: "Carrossel" },
+  { k: "blog", l: "Blog" },
+  { k: "email", l: "E-mail" },
+] as const;
+
+function contarCanaisPublicados(status: any): number {
+  if (!status || typeof status !== "object") return 0;
+  return CANAIS.reduce((n, c) => (status[c.k] ? n + 1 : n), 0);
+}
+
 function CardImagem({ img, onClick }: { img: any; onClick: () => void }) {
-  const statusColor: Record<string, string> = {
-    nao_usado: "bg-[color:var(--muted-foreground)]",
-    rascunho: "bg-[color:var(--bronze)]",
-    publicado: "bg-green-600",
-  };
   const tagsVisiveis = (img.tags ?? []).slice(0, 4);
   const restantes = (img.tags?.length ?? 0) - tagsVisiveis.length;
+  const publicados = contarCanaisPublicados(img.status_canais);
 
   return (
     <button
@@ -242,9 +252,17 @@ function CardImagem({ img, onClick }: { img: any; onClick: () => void }) {
           {img.tipo === "foto_real" ? "FOTO REAL" : "RENDER"}
         </span>
         <span
-          className={`absolute bottom-2 right-2 h-3 w-3 rounded-full border-2 border-white ${statusColor[img.status_publicacao] ?? "bg-[color:var(--muted-foreground)]"}`}
-          title={img.status_publicacao}
-        />
+          className={`absolute bottom-2 right-2 px-2 py-0.5 rounded-[3px] text-[9px] font-mono tracking-widest ${
+            publicados === 0
+              ? "bg-white/90 text-[color:var(--muted-foreground)]"
+              : publicados === CANAIS.length
+              ? "bg-green-600 text-white"
+              : "bg-[color:var(--bronze)] text-white"
+          }`}
+          title={`${publicados} canais publicados`}
+        >
+          {publicados}/{CANAIS.length}
+        </span>
       </div>
       <div className="px-3 py-3">
         <div className="text-sm text-[color:var(--graphite)] font-serif line-clamp-1">
