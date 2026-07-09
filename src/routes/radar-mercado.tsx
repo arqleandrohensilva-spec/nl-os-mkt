@@ -108,7 +108,7 @@ function RadarMercadoPage() {
   const [aberto, setAberto] = useState<Lancamento | null>(null);
   const [loadingStage, setLoadingStage] = useState<"idle" | "buscando" | "analisando">("idle");
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualStage, setManualStage] = useState<"idle" | "pesquisando" | "consolidando" | "criando">("idle");
+  const [manualStage, setManualStage] = useState<"idle" | "pesquisando" | "identificando" | "criando">("idle");
 
   const { data: lancamentos } = useQuery({
     queryKey: ["lancamentos"],
@@ -166,11 +166,10 @@ function RadarMercadoPage() {
   });
 
   const manualMut = useMutation({
-    mutationFn: async (input: { nome: string; informacoes_brutas: string; tipo: string; cidade: string }) => {
+    mutationFn: async (input: { nome: string }) => {
       setManualStage("pesquisando");
-      // Encenar estágios visuais durante a chamada
       const timers: ReturnType<typeof setTimeout>[] = [];
-      timers.push(setTimeout(() => setManualStage("consolidando"), 4000));
+      timers.push(setTimeout(() => setManualStage("identificando"), 4000));
       timers.push(setTimeout(() => setManualStage("criando"), 9000));
       try {
         const row = await adicionar({ data: input });
@@ -679,7 +678,7 @@ function Info({ label, valor }: { label: string; valor: string }) {
   );
 }
 
-type ManualForm = { nome: string; informacoes_brutas: string; tipo: string; cidade: string };
+type ManualForm = { nome: string };
 
 function ManualModal({
   onClose,
@@ -690,20 +689,17 @@ function ManualModal({
   onClose: () => void;
   onSubmit: (v: ManualForm) => void;
   loading: boolean;
-  stage: "idle" | "pesquisando" | "consolidando" | "criando";
+  stage: "idle" | "pesquisando" | "identificando" | "criando";
 }) {
   const [nome, setNome] = useState("");
-  const [info, setInfo] = useState("");
-  const [tipo, setTipo] = useState("nao_sei");
-  const [cidade, setCidade] = useState("SJC");
 
-  const podeSubmeter = nome.trim().length > 0 && info.trim().length >= 20 && !loading;
+  const podeSubmeter = nome.trim().length > 0 && !loading;
 
   const stageLabel =
     stage === "pesquisando"
-      ? `Pesquisando na web por ${nome || "empreendimento"}...`
-      : stage === "consolidando"
-        ? "Consolidando informações..."
+      ? `Buscando informações sobre ${nome || "empreendimento"}...`
+      : stage === "identificando"
+        ? "Identificando tipo, localização e construtora..."
         : stage === "criando"
           ? "Criando oportunidade..."
           : "";
@@ -744,59 +740,9 @@ function ManualModal({
             />
           </label>
 
-          <label className="block">
-            <span className="font-mono text-[10px] tracking-widest text-[color:var(--muted-foreground)]">
-              O QUE VOCÊ SABE SOBRE ELE
-            </span>
-            <textarea
-              value={info}
-              onChange={(e) => setInfo(e.target.value)}
-              disabled={loading}
-              rows={6}
-              placeholder="Cole aqui qualquer informação que tiver: nome da construtora, bairro, faixa de preço, link, o que ouviu de um corretor, foto de placa... quanto mais informação, melhor a análise."
-              className="mt-1 w-full border border-[color:var(--divisoria)] rounded-[4px] px-3 py-2 text-sm"
-            />
-            <span className="text-[11px] text-[color:var(--muted-foreground)] mt-1 block">
-              Mínimo 20 caracteres · {info.trim().length}/20
-            </span>
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="font-mono text-[10px] tracking-widest text-[color:var(--muted-foreground)]">
-                TIPO
-              </span>
-              <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value)}
-                disabled={loading}
-                className="mt-1 w-full border border-[color:var(--divisoria)] rounded-[4px] px-3 py-2 text-sm bg-white"
-              >
-                <option value="loteamento">Loteamento</option>
-                <option value="condominio">Condomínio</option>
-                <option value="apartamento">Apartamento</option>
-                <option value="comercial">Comercial</option>
-                <option value="nao_sei">Não sei</option>
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="font-mono text-[10px] tracking-widest text-[color:var(--muted-foreground)]">
-                CIDADE
-              </span>
-              <select
-                value={cidade}
-                onChange={(e) => setCidade(e.target.value)}
-                disabled={loading}
-                className="mt-1 w-full border border-[color:var(--divisoria)] rounded-[4px] px-3 py-2 text-sm bg-white"
-              >
-                <option value="SJC">SJC</option>
-                <option value="Jacareí">Jacareí</option>
-                <option value="Caçapava">Caçapava</option>
-                <option value="Outra">Outra</option>
-              </select>
-            </label>
-          </div>
+          <p className="text-[12px] text-[color:var(--muted-foreground)]">
+            O sistema pesquisa automaticamente na web tudo que existir sobre o empreendimento — tipo, cidade, construtora, bairro, faixa de preço e link de referência.
+          </p>
 
           {loading && (
             <div className="flex items-center gap-2 text-sm text-[color:var(--bronze)] border border-[color:var(--bronze)]/30 bg-[color:var(--bege)] rounded-[4px] px-3 py-2">
@@ -815,13 +761,11 @@ function ManualModal({
             Cancelar
           </button>
           <button
-            onClick={() =>
-              onSubmit({ nome: nome.trim(), informacoes_brutas: info.trim(), tipo, cidade })
-            }
+            onClick={() => onSubmit({ nome: nome.trim() })}
             disabled={!podeSubmeter}
             className="rounded-[4px] bg-[color:var(--graphite)] px-4 py-2 text-sm text-white hover:bg-black disabled:opacity-40"
           >
-            {loading ? "Processando…" : "Pesquisar e adicionar"}
+            {loading ? "Processando…" : "Buscar e adicionar"}
           </button>
         </div>
       </div>
