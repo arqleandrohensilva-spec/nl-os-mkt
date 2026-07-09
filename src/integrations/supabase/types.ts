@@ -218,6 +218,60 @@ export type Database = {
         }
         Relationships: []
       }
+      lancamentos: {
+        Row: {
+          bairro: string | null
+          cidade: string
+          construtora: string | null
+          conteudos: Json | null
+          created_at: string
+          data_lancamento: string | null
+          descricao: string | null
+          faixa_preco: string | null
+          id: string
+          nome: string
+          notas: string | null
+          oportunidade_linha: string | null
+          status: string | null
+          tipo: string
+          url_fonte: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cidade: string
+          construtora?: string | null
+          conteudos?: Json | null
+          created_at?: string
+          data_lancamento?: string | null
+          descricao?: string | null
+          faixa_preco?: string | null
+          id?: string
+          nome: string
+          notas?: string | null
+          oportunidade_linha?: string | null
+          status?: string | null
+          tipo: string
+          url_fonte?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cidade?: string
+          construtora?: string | null
+          conteudos?: Json | null
+          created_at?: string
+          data_lancamento?: string | null
+          descricao?: string | null
+          faixa_preco?: string | null
+          id?: string
+          nome?: string
+          notas?: string | null
+          oportunidade_linha?: string | null
+          status?: string | null
+          tipo?: string
+          url_fonte?: string | null
+        }
+        Relationships: []
+      }
       objecoes: {
         Row: {
           categoria: string | null
@@ -386,6 +440,30 @@ export type Database = {
           linha?: string
           nome?: string
           status?: string
+        }
+        Relationships: []
+      }
+      radar_buscas: {
+        Row: {
+          created_at: string
+          id: string
+          novos_lancamentos: number | null
+          resultados_encontrados: number | null
+          resumo: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          novos_lancamentos?: number | null
+          resultados_encontrados?: number | null
+          resumo?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          novos_lancamentos?: number | null
+          resultados_encontrados?: number | null
+          resumo?: string | null
         }
         Relationships: []
       }
