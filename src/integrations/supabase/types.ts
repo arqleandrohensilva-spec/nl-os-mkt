@@ -41,6 +41,70 @@ export type Database = {
         }
         Relationships: []
       }
+      antes_depois: {
+        Row: {
+          ambiente: string | null
+          conteudos: Json | null
+          created_at: string
+          descricao_transformacao: string | null
+          id: string
+          imagem_antes_id: string | null
+          imagem_depois_id: string | null
+          linha: string
+          nome: string
+          projeto_id: string | null
+          status_publicacao: Json
+        }
+        Insert: {
+          ambiente?: string | null
+          conteudos?: Json | null
+          created_at?: string
+          descricao_transformacao?: string | null
+          id?: string
+          imagem_antes_id?: string | null
+          imagem_depois_id?: string | null
+          linha: string
+          nome: string
+          projeto_id?: string | null
+          status_publicacao?: Json
+        }
+        Update: {
+          ambiente?: string | null
+          conteudos?: Json | null
+          created_at?: string
+          descricao_transformacao?: string | null
+          id?: string
+          imagem_antes_id?: string | null
+          imagem_depois_id?: string | null
+          linha?: string
+          nome?: string
+          projeto_id?: string | null
+          status_publicacao?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "antes_depois_imagem_antes_id_fkey"
+            columns: ["imagem_antes_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_imagens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "antes_depois_imagem_depois_id_fkey"
+            columns: ["imagem_depois_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_imagens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "antes_depois_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       biblioteca_imagens: {
         Row: {
           ambiente: string | null
@@ -52,7 +116,7 @@ export type Database = {
           linha: string
           nome_arquivo: string
           projeto_id: string | null
-          status_publicacao: string
+          status_canais: Json
           tags: string[]
           tipo: string
           ultima_vez_usada: string | null
@@ -69,7 +133,7 @@ export type Database = {
           linha: string
           nome_arquivo: string
           projeto_id?: string | null
-          status_publicacao?: string
+          status_canais?: Json
           tags?: string[]
           tipo: string
           ultima_vez_usada?: string | null
@@ -86,7 +150,7 @@ export type Database = {
           linha?: string
           nome_arquivo?: string
           projeto_id?: string | null
-          status_publicacao?: string
+          status_canais?: Json
           tags?: string[]
           tipo?: string
           ultima_vez_usada?: string | null
