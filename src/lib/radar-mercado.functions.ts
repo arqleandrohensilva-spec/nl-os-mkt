@@ -306,45 +306,29 @@ export const atualizarLancamento = createServerFn({ method: "POST" })
 
 const ManualInput = z.object({
   nome: z.string().min(1),
-  informacoes_brutas: z.string().min(20),
-  tipo: z.string().min(1),
-  cidade: z.string().min(1),
 });
 
-const SYSTEM_PROMPT_MANUAL = `Você é o radar de mercado da NL Arquitetos.
-Recebe o nome de um empreendimento imobiliário e informações brutas sobre ele, e deve:
+const SYSTEM_PROMPT_MANUAL = `Você é o radar de mercado da NL Arquitetos em São José dos Campos, SP.
 
-1. Pesquisar na web por mais informações sobre esse empreendimento específico
-2. Consolidar tudo (o que foi informado + o que encontrou)
-3. Retornar um registro completo e estruturado
+Recebe apenas o nome de um empreendimento imobiliário e deve pesquisar na web tudo que existir sobre ele.
 
 Responda EXCLUSIVAMENTE com JSON puro, sem markdown:
 {
   "nome": "nome oficial do empreendimento",
   "tipo": "loteamento|condominio|apartamento|comercial",
-  "cidade": "cidade",
+  "cidade": "SJC|Jacareí|Caçapava|Outra",
   "construtora": "nome da construtora ou null",
-  "bairro": "bairro ou região",
+  "bairro": "bairro ou região ou null",
   "faixa_preco": "faixa de preço ou null",
-  "descricao": "descrição completa em 3-4 frases combinando o que foi informado e o que foi encontrado na web",
+  "descricao": "descrição completa em 3-4 frases com tudo que encontrou",
   "url_fonte": "melhor URL encontrada ou null",
-  "data_lancamento": "data aproximada ou null",
-  "informacao_adicional": "qualquer informação relevante encontrada na web que não estava nas informações brutas"
+  "data_lancamento": "data aproximada ou null"
 }`;
 
 export const adicionarManual = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => ManualInput.parse(input))
   .handler(async ({ data }) => {
-    const userPrompt = [
-      `Nome do empreendimento: ${data.nome}`,
-      `Cidade: ${data.cidade}`,
-      `Tipo informado: ${data.tipo}`,
-      ``,
-      `Informações que tenho:`,
-      data.informacoes_brutas,
-      ``,
-      `Pesquise na web por mais informações sobre esse empreendimento e retorne o registro completo e estruturado.`,
-    ].join("\n");
+    const userPrompt = `Pesquise na web tudo que existir sobre o empreendimento imobiliário chamado '${data.nome}', preferencialmente na região de São José dos Campos, Jacareí ou Caçapava no interior de São Paulo. Retorne todas as informações encontradas no formato solicitado.`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -382,24 +366,21 @@ export const adicionarManual = createServerFn({ method: "POST" })
       descricao: string | null;
       url_fonte: string | null;
       data_lancamento: string | null;
-      informacao_adicional: string | null;
     }>(finalText);
 
     const tipo = ["loteamento", "condominio", "apartamento", "comercial"].includes(parsed.tipo)
       ? parsed.tipo
-      : (["loteamento", "condominio", "apartamento", "comercial"].includes(data.tipo) ? data.tipo : "loteamento");
+      : "loteamento";
 
     const client = sb();
-    const descricao = parsed.informacao_adicional
-      ? `${parsed.descricao ?? ""}\n\nInfo adicional: ${parsed.informacao_adicional}`.trim()
-      : parsed.descricao;
+    const descricao = parsed.descricao;
 
     const { data: inserted, error } = await client
       .from("lancamentos")
       .insert({
         nome: parsed.nome || data.nome,
         tipo,
-        cidade: parsed.cidade || data.cidade,
+        cidade: parsed.cidade || "Outra",
         construtora: parsed.construtora,
         bairro: parsed.bairro,
         faixa_preco: parsed.faixa_preco,
@@ -419,7 +400,7 @@ export const adicionarManual = createServerFn({ method: "POST" })
       operacao: "adicao_manual",
       tokens_input: json?.usage?.input_tokens ?? 0,
       tokens_output: json?.usage?.output_tokens ?? 0,
-      detalhes: { nome: data.nome, cidade: data.cidade },
+      detalhes: { nome: data.nome },
     });
 
     return inserted;
