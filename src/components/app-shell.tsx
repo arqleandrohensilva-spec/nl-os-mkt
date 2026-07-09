@@ -1,5 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard,
   Sparkles,
@@ -47,6 +49,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
+  const { data: followupsVencidos } = useQuery({
+    queryKey: ["sidebar-followups-vencidos"],
+    queryFn: async () => {
+      const hoje = new Date().toISOString().slice(0, 10);
+      const { data } = await (supabase as any)
+        .from("prospeccoes")
+        .select("id")
+        .lt("data_followup", hoje)
+        .not("data_followup", "is", null)
+        .not("status", "in", "(parceria_ativa,sem_interesse,arquivado)");
+      return (data ?? []).length as number;
+    },
+    refetchInterval: 60_000,
+  });
+
   useEffect(() => {
     try {
       const v = localStorage.getItem(STORAGE_KEY);
@@ -77,6 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           pathname={pathname}
           onNavigate={() => {}}
           collapsed={collapsed}
+          badges={{ "/prospeccao": followupsVencidos ?? 0 }}
         />
         <button
           onClick={toggleCollapsed}
