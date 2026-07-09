@@ -5,7 +5,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { analisarImagem, regenerarConteudos } from "@/lib/biblioteca.functions";
+import {
+  gerarAntesDepois,
+  regenerarAntesDepois,
+  gerarNarrativaProjeto,
+} from "@/lib/antes-depois.functions";
 import { signBibliotecaUrls } from "@/components/biblioteca-picker";
+import { BibliotecaPicker, type BibliotecaImagemLite } from "@/components/biblioteca-picker";
 import {
   X,
   Upload,
@@ -13,12 +19,12 @@ import {
   Loader2,
   Copy,
   RotateCcw,
-  CheckCircle2,
   Folder,
   Plus,
   Search,
   Archive,
-  Trash2,
+  Sparkles,
+  ArrowLeftRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,7 +59,7 @@ const LINHAS = [
 
 function BibliotecaPage() {
   const search = Route.useSearch();
-  const [tab, setTab] = useState<"biblioteca" | "adicionar" | "projetos">(
+  const [tab, setTab] = useState<"biblioteca" | "adicionar" | "antes_depois" | "projetos">(
     (search.tab as any) ?? "biblioteca",
   );
 
@@ -70,6 +76,7 @@ function BibliotecaPage() {
           {[
             { k: "biblioteca", label: "Biblioteca" },
             { k: "adicionar", label: "Adicionar" },
+            { k: "antes_depois", label: "Antes e Depois" },
             { k: "projetos", label: "Projetos" },
           ].map((t) => (
             <button
@@ -88,6 +95,7 @@ function BibliotecaPage() {
 
         {tab === "biblioteca" && <AbaBiblioteca projetoInicial={search.projeto} />}
         {tab === "adicionar" && <AbaAdicionar onDone={() => setTab("biblioteca")} />}
+        {tab === "antes_depois" && <AbaAntesDepois />}
         {tab === "projetos" && <AbaProjetos onVer={() => setTab("biblioteca")} />}
       </div>
     </>
@@ -101,7 +109,6 @@ function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
   const [busca, setBusca] = useState("");
   const [linha, setLinha] = useState("");
   const [tipo, setTipo] = useState("");
-  const [status, setStatus] = useState("");
   const [projetoId, setProjetoId] = useState(projetoInicial ?? "");
   const [selecionada, setSelecionada] = useState<any | null>(null);
 
@@ -115,7 +122,7 @@ function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
   });
 
   const { data: imagens } = useQuery({
-    queryKey: ["biblioteca", linha, tipo, status, projetoId],
+    queryKey: ["biblioteca", linha, tipo, projetoId],
     queryFn: async () => {
       let q = supabase
         .from("biblioteca_imagens")
@@ -123,7 +130,6 @@ function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
         .order("created_at", { ascending: false });
       if (linha) q = q.eq("linha", linha);
       if (tipo) q = q.eq("tipo", tipo);
-      if (status) q = q.eq("status_publicacao", status);
       if (projetoId) q = q.eq("projeto_id", projetoId);
       const { data, error } = await q;
       if (error) throw error;
@@ -178,12 +184,6 @@ function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
           <option value="foto_real">Foto real</option>
           <option value="render">Render</option>
         </FilterSel>
-        <FilterSel value={status} onChange={setStatus} label="Status">
-          <option value="">Todos</option>
-          <option value="nao_usado">Não usado</option>
-          <option value="rascunho">Rascunho</option>
-          <option value="publicado">Publicado</option>
-        </FilterSel>
         <FilterSel value={projetoId} onChange={setProjetoId} label="Projeto">
           <option value="">Todos</option>
           {(projetos ?? []).map((p: any) => (
@@ -214,14 +214,24 @@ function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
   );
 }
 
+const CANAIS = [
+  { k: "feed", l: "Feed" },
+  { k: "stories", l: "Stories" },
+  { k: "reels", l: "Reels" },
+  { k: "carrossel", l: "Carrossel" },
+  { k: "blog", l: "Blog" },
+  { k: "email", l: "E-mail" },
+] as const;
+
+function contarCanaisPublicados(status: any): number {
+  if (!status || typeof status !== "object") return 0;
+  return CANAIS.reduce((n, c) => (status[c.k] ? n + 1 : n), 0);
+}
+
 function CardImagem({ img, onClick }: { img: any; onClick: () => void }) {
-  const statusColor: Record<string, string> = {
-    nao_usado: "bg-[color:var(--muted-foreground)]",
-    rascunho: "bg-[color:var(--bronze)]",
-    publicado: "bg-green-600",
-  };
   const tagsVisiveis = (img.tags ?? []).slice(0, 4);
   const restantes = (img.tags?.length ?? 0) - tagsVisiveis.length;
+  const publicados = contarCanaisPublicados(img.status_canais);
 
   return (
     <button
@@ -243,9 +253,17 @@ function CardImagem({ img, onClick }: { img: any; onClick: () => void }) {
           {img.tipo === "foto_real" ? "FOTO REAL" : "RENDER"}
         </span>
         <span
-          className={`absolute bottom-2 right-2 h-3 w-3 rounded-full border-2 border-white ${statusColor[img.status_publicacao] ?? "bg-[color:var(--muted-foreground)]"}`}
-          title={img.status_publicacao}
-        />
+          className={`absolute bottom-2 right-2 px-2 py-0.5 rounded-[3px] text-[9px] font-mono tracking-widest ${
+            publicados === 0
+              ? "bg-white/90 text-[color:var(--muted-foreground)]"
+              : publicados === CANAIS.length
+              ? "bg-green-600 text-white"
+              : "bg-[color:var(--bronze)] text-white"
+          }`}
+          title={`${publicados} canais publicados`}
+        >
+          {publicados}/{CANAIS.length}
+        </span>
       </div>
       <div className="px-3 py-3">
         <div className="text-sm text-[color:var(--graphite)] font-serif line-clamp-1">
@@ -286,25 +304,6 @@ function DrawerDetalhes({ imagem, onClose }: { imagem: any; onClose: () => void 
       onClose();
     },
     onError: (err: any) => toast.error(err?.message ?? "Erro ao regenerar"),
-  });
-
-  const marcarPublicado = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("biblioteca_imagens")
-        .update({
-          status_publicacao: "publicado",
-          ultima_vez_usada: new Date().toISOString(),
-          vezes_usada: (imagem.vezes_usada ?? 0) + 1,
-        })
-        .eq("id", imagem.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Marcada como publicada.");
-      qc.invalidateQueries({ queryKey: ["biblioteca"] });
-      onClose();
-    },
   });
 
   const copies = imagem.copies ?? {};
@@ -427,19 +426,14 @@ function DrawerDetalhes({ imagem, onClose }: { imagem: any; onClose: () => void 
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-2 text-xs text-[color:var(--muted-foreground)] border-t border-[color:var(--divisoria)]">
-            <span>Usada {imagem.vezes_usada ?? 0} vez(es)</span>
-            <span>Status: {imagem.status_publicacao}</span>
-          </div>
+          <StatusCanaisPanel
+            tabela="biblioteca_imagens"
+            id={imagem.id}
+            status={imagem.status_canais}
+            queryKey={["biblioteca"]}
+          />
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => marcarPublicado.mutate()}
-              disabled={marcarPublicado.isPending || imagem.status_publicacao === "publicado"}
-              className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-4 py-2 text-xs text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40"
-            >
-              <CheckCircle2 className="h-4 w-4" /> Marcar como publicado
-            </button>
             <button
               onClick={() => regenMut.mutate()}
               disabled={regenMut.isPending}
@@ -865,6 +859,7 @@ function AbaProjetos({ onVer }: { onVer: () => void }) {
   const qc = useQueryClient();
   const [novoModal, setNovoModal] = useState(false);
   const [editando, setEditando] = useState<any | null>(null);
+  const [narrativaProj, setNarrativaProj] = useState<any | null>(null);
 
   const { data: projetos } = useQuery({
     queryKey: ["projetos-detalhe"],
@@ -934,6 +929,12 @@ function AbaProjetos({ onVer }: { onVer: () => void }) {
                 >
                   Editar
                 </button>
+                <button
+                  onClick={() => setNarrativaProj(p)}
+                  className="text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)] inline-flex items-center gap-1"
+                >
+                  <Sparkles className="h-3 w-3" /> Narrativa
+                </button>
                 {p.status !== "arquivado" && (
                   <button
                     onClick={() => arquivar.mutate(p.id)}
@@ -950,6 +951,9 @@ function AbaProjetos({ onVer }: { onVer: () => void }) {
 
       {novoModal && <ProjetoModal onClose={() => setNovoModal(false)} onCreated={() => setNovoModal(false)} />}
       {editando && <ProjetoModal projeto={editando} onClose={() => setEditando(null)} onCreated={() => setEditando(null)} />}
+      {narrativaProj && (
+        <NarrativaProjetoDrawer projeto={narrativaProj} onClose={() => setNarrativaProj(null)} />
+      )}
     </div>
   );
 }
@@ -1040,6 +1044,649 @@ function ProjetoModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// STATUS DE PUBLICAÇÃO POR CANAL
+// ============================================================
+function StatusCanaisPanel({
+  tabela,
+  id,
+  status,
+  queryKey,
+}: {
+  tabela: "biblioteca_imagens" | "antes_depois";
+  id: string;
+  status: any;
+  queryKey: string[];
+}) {
+  const qc = useQueryClient();
+  const atual = useMemo(() => {
+    const base: Record<string, boolean> = {};
+    CANAIS.forEach((c) => (base[c.k] = !!status?.[c.k]));
+    return base;
+  }, [status]);
+
+  const toggle = useMutation({
+    mutationFn: async (canal: string) => {
+      const novo = { ...atual, [canal]: !atual[canal] };
+      const col = tabela === "biblioteca_imagens" ? "status_canais" : "status_publicacao";
+      const { error } = await supabase
+        .from(tabela)
+        .update({ [col]: novo as never })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao atualizar status"),
+  });
+
+  const publicados = CANAIS.reduce((n, c) => (atual[c.k] ? n + 1 : n), 0);
+
+  return (
+    <div className="border-t border-[color:var(--divisoria)] pt-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+          STATUS DE PUBLICAÇÃO
+        </div>
+        <div className="text-[10px] font-mono tracking-widest text-[color:var(--muted-foreground)]">
+          {publicados}/{CANAIS.length}
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {CANAIS.map((c) => {
+          const on = atual[c.k];
+          return (
+            <button
+              key={c.k}
+              onClick={() => toggle.mutate(c.k)}
+              disabled={toggle.isPending}
+              className={`px-2.5 py-1.5 text-[10px] font-mono tracking-widest uppercase rounded-[3px] border transition-colors ${
+                on
+                  ? "bg-green-600 text-white border-green-600"
+                  : "bg-white text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+              }`}
+            >
+              {on ? "✓ " : "○ "}
+              {c.l}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ABA — ANTES E DEPOIS
+// ============================================================
+function AbaAntesDepois() {
+  const [novo, setNovo] = useState(false);
+  const [selecionado, setSelecionado] = useState<any | null>(null);
+
+  const { data } = useQuery({
+    queryKey: ["antes-depois"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("antes_depois")
+        .select(
+          "*, projeto:projetos(nome), antes:biblioteca_imagens!antes_depois_imagem_antes_id_fkey(id, url_storage, nome_arquivo), depois:biblioteca_imagens!antes_depois_imagem_depois_id_fkey(id, url_storage, nome_arquivo)",
+        )
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const rows = (data ?? []) as any[];
+      const paths = rows.flatMap((r) => [r.antes?.url_storage, r.depois?.url_storage].filter(Boolean));
+      const map = await signBibliotecaUrls(paths);
+      return rows.map((r) => ({
+        ...r,
+        antes_url: r.antes?.url_storage ? map[r.antes.url_storage] : null,
+        depois_url: r.depois?.url_storage ? map[r.depois.url_storage] : null,
+      }));
+    },
+  });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+          {data?.length ?? 0} COMPARATIVOS
+        </div>
+        <button
+          onClick={() => setNovo(true)}
+          className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-4 py-2 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors"
+        >
+          <Plus className="h-4 w-4" /> Novo comparativo
+        </button>
+      </div>
+
+      {(data?.length ?? 0) === 0 ? (
+        <div className="border border-dashed border-[color:var(--divisoria)] rounded-lg p-10 text-center">
+          <ArrowLeftRight className="h-8 w-8 mx-auto mb-3 text-[color:var(--muted-foreground)]" />
+          <p className="text-[color:var(--muted-foreground)]">
+            Ainda sem comparativos. Crie o primeiro com duas imagens da biblioteca.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(data ?? []).map((c: any) => (
+            <button
+              key={c.id}
+              onClick={() => setSelecionado(c)}
+              className="text-left border border-[color:var(--divisoria)] rounded-lg overflow-hidden bg-white hover:border-[color:var(--bronze)] transition-colors"
+            >
+              <div className="grid grid-cols-2 gap-px bg-[color:var(--divisoria)]">
+                <div className="aspect-[4/3] bg-[color:var(--gelo)] relative">
+                  {c.antes_url ? (
+                    <img src={c.antes_url} alt="antes" className="w-full h-full object-cover" />
+                  ) : null}
+                  <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono tracking-widest bg-white/90 uppercase text-[color:var(--bronze)]" style={{ fontFamily: "Courier New, monospace" }}>
+                    ANTES
+                  </span>
+                </div>
+                <div className="aspect-[4/3] bg-[color:var(--gelo)] relative">
+                  {c.depois_url ? (
+                    <img src={c.depois_url} alt="depois" className="w-full h-full object-cover" />
+                  ) : null}
+                  <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono tracking-widest bg-white/90 uppercase text-[color:var(--bronze)]" style={{ fontFamily: "Courier New, monospace" }}>
+                    DEPOIS
+                  </span>
+                </div>
+              </div>
+              <div className="px-3 py-3">
+                <div className="font-serif text-base text-[color:var(--graphite)] line-clamp-1">{c.nome}</div>
+                <div className="mt-0.5 font-mono text-[10px] tracking-widest text-[color:var(--bronze)] uppercase">
+                  {c.projeto?.nome ?? "Sem projeto"} · Linha {c.linha}
+                  {c.ambiente ? ` · ${c.ambiente}` : ""}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {CANAIS.map((canal) => {
+                    const on = !!c.status_publicacao?.[canal.k];
+                    return (
+                      <span
+                        key={canal.k}
+                        className={`text-[9px] font-mono tracking-widest uppercase px-1.5 py-0.5 rounded-[2px] ${
+                          on ? "bg-green-600 text-white" : "bg-[color:var(--gelo)] text-[color:var(--muted-foreground)]"
+                        }`}
+                      >
+                        {canal.l}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {novo && <NovoComparativoModal onClose={() => setNovo(false)} />}
+      {selecionado && (
+        <DrawerAntesDepois comparativo={selecionado} onClose={() => setSelecionado(null)} />
+      )}
+    </div>
+  );
+}
+
+function NovoComparativoModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const gerar = useServerFn(gerarAntesDepois);
+  const { data: projetos } = useProjetos();
+  const [nome, setNome] = useState("");
+  const [projetoId, setProjetoId] = useState("");
+  const [linha, setLinha] = useState("A");
+  const [ambiente, setAmbiente] = useState("Sala de estar");
+  const [antes, setAntes] = useState<BibliotecaImagemLite | null>(null);
+  const [depois, setDepois] = useState<BibliotecaImagemLite | null>(null);
+  const [pickerAlvo, setPickerAlvo] = useState<"antes" | "depois" | null>(null);
+
+  async function pathToBase64(path: string): Promise<{ base64: string; media_type: string }> {
+    const { data, error } = await supabase.storage.from("biblioteca-visual").download(path);
+    if (error || !data) throw new Error("Falha ao baixar imagem da biblioteca.");
+    const buf = new Uint8Array(await data.arrayBuffer());
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < buf.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, Array.from(buf.subarray(i, i + chunk)));
+    }
+    return { base64: btoa(binary), media_type: data.type || "image/jpeg" };
+  }
+
+  const mut = useMutation({
+    mutationFn: async () => {
+      if (!nome.trim()) throw new Error("Dê um nome ao comparativo.");
+      if (!antes || !depois) throw new Error("Escolha as duas imagens.");
+      const a = await pathToBase64(antes.url_storage);
+      const d = await pathToBase64(depois.url_storage);
+      return gerar({
+        data: {
+          nome,
+          linha,
+          ambiente,
+          projeto_id: projetoId || null,
+          imagem_antes_id: antes.id,
+          imagem_depois_id: depois.id,
+          antes_base64: a.base64,
+          antes_media_type: a.media_type,
+          depois_base64: d.base64,
+          depois_media_type: d.media_type,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Comparativo criado.");
+      qc.invalidateQueries({ queryKey: ["antes-depois"] });
+      onClose();
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao gerar comparativo"),
+  });
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className="w-full max-w-2xl bg-white rounded-lg overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[color:var(--divisoria)] flex items-center justify-between">
+          <div className="font-serif text-lg">Novo comparativo</div>
+          <button onClick={onClose}><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-5 space-y-4 overflow-y-auto">
+          <Field label="Nome do comparativo">
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Ex: Sala de estar — Vila Maria"
+              className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-[color:var(--gelo)] px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--bronze)]"
+            />
+          </Field>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Field label="Projeto">
+              <select value={projetoId} onChange={(e) => setProjetoId(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+                <option value="">— Sem projeto —</option>
+                {(projetos ?? []).map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.nome}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Linha">
+              <select value={linha} onChange={(e) => setLinha(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+                {LINHAS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Ambiente">
+              <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)} className="w-full rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm">
+                {AMBIENTES.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {(["antes", "depois"] as const).map((slot) => {
+              const img = slot === "antes" ? antes : depois;
+              return (
+                <div key={slot}>
+                  <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1 uppercase" style={{ fontFamily: "Courier New, monospace" }}>
+                    IMAGEM {slot}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPickerAlvo(slot)}
+                    className="w-full aspect-[4/3] border border-dashed border-[color:var(--divisoria)] rounded-[4px] bg-[color:var(--gelo)] hover:border-[color:var(--bronze)] flex items-center justify-center overflow-hidden"
+                  >
+                    {img?.signed_url ? (
+                      <img src={img.signed_url} alt={slot} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-[color:var(--muted-foreground)] text-xs">Escolher da biblioteca</div>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => mut.mutate()}
+            disabled={mut.isPending}
+            className="w-full rounded-[4px] bg-[color:var(--graphite)] px-4 py-2.5 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40 inline-flex items-center justify-center gap-2"
+          >
+            {mut.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando…</> : <>Gerar conteúdos de transformação</>}
+          </button>
+        </div>
+
+        <BibliotecaPicker
+          open={pickerAlvo !== null}
+          onClose={() => setPickerAlvo(null)}
+          onSelect={(img) => {
+            if (pickerAlvo === "antes") setAntes(img);
+            if (pickerAlvo === "depois") setDepois(img);
+            setPickerAlvo(null);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DrawerAntesDepois({ comparativo, onClose }: { comparativo: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const regen = useServerFn(regenerarAntesDepois);
+  const [aba, setAba] = useState<
+    "feed" | "stories" | "reels" | "roteiro_reels" | "carrossel" | "blog" | "email"
+  >("feed");
+
+  const regenMut = useMutation({
+    mutationFn: async () => regen({ data: { id: comparativo.id } }),
+    onSuccess: () => {
+      toast.success("Conteúdos regenerados.");
+      qc.invalidateQueries({ queryKey: ["antes-depois"] });
+      onClose();
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao regenerar"),
+  });
+
+  const conteudos = comparativo.conteudos ?? {};
+  const textoAtual = conteudos[aba] ?? "";
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="w-full md:w-[720px] bg-white h-full overflow-y-auto border-l border-[color:var(--divisoria)]">
+        <div className="sticky top-0 bg-white z-10 border-b border-[color:var(--divisoria)] px-5 py-3 flex items-center justify-between">
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+              ANTES E DEPOIS · LINHA {comparativo.linha}
+            </div>
+            <div className="font-serif text-lg mt-0.5">{comparativo.nome}</div>
+          </div>
+          <button onClick={onClose} className="p-1"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-5 space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { url: comparativo.antes_url, label: "ANTES" },
+              { url: comparativo.depois_url, label: "DEPOIS" },
+            ].map((slot) => (
+              <div key={slot.label} className="relative aspect-[4/3] bg-[color:var(--gelo)] rounded-lg overflow-hidden">
+                {slot.url ? <img src={slot.url} alt={slot.label} className="w-full h-full object-cover" /> : null}
+                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-[3px] text-[10px] tracking-widest bg-white/95 uppercase text-[color:var(--bronze)]" style={{ fontFamily: "Courier New, monospace" }}>
+                  {slot.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1">
+              DESCRIÇÃO DA TRANSFORMAÇÃO
+            </div>
+            <p className="text-sm text-[color:var(--graphite)] leading-relaxed">
+              {comparativo.descricao_transformacao ?? "—"}
+            </p>
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-2">
+              CONTEÚDOS
+            </div>
+            <div className="flex flex-wrap gap-1 mb-3">
+              {[
+                { k: "feed", l: "Feed" },
+                { k: "stories", l: "Stories" },
+                { k: "reels", l: "Reels" },
+                { k: "roteiro_reels", l: "Roteiro" },
+                { k: "carrossel", l: "Carrossel" },
+                { k: "blog", l: "Blog" },
+                { k: "email", l: "E-mail" },
+              ].map((t) => (
+                <button
+                  key={t.k}
+                  onClick={() => setAba(t.k as any)}
+                  className={`px-2.5 py-1 text-[10px] font-mono tracking-widest uppercase rounded-[3px] border transition-colors ${
+                    aba === t.k
+                      ? "bg-[color:var(--graphite)] text-white border-[color:var(--graphite)]"
+                      : "bg-white text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                  }`}
+                >
+                  {t.l}
+                </button>
+              ))}
+            </div>
+            <div className="border border-[color:var(--divisoria)] rounded-lg bg-white p-4 text-sm whitespace-pre-wrap min-h-[120px] leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>
+              {textoAtual || "—"}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(textoAtual).then(
+                    () => toast.success("Texto copiado."),
+                    () => toast.error("Não foi possível copiar."),
+                  );
+                }}
+                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+              >
+                <Copy className="h-3 w-3" /> Copiar
+              </button>
+            </div>
+          </div>
+
+          <StatusCanaisPanel
+            tabela="antes_depois"
+            id={comparativo.id}
+            status={comparativo.status_publicacao}
+            queryKey={["antes-depois"]}
+          />
+
+          <div>
+            <button
+              onClick={() => regenMut.mutate()}
+              disabled={regenMut.isPending}
+              className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-4 py-2 text-xs hover:border-[color:var(--bronze)]"
+            >
+              {regenMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              Regenerar conteúdos
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ============================================================
+// NARRATIVA DO PROJETO
+// ============================================================
+function NarrativaProjetoDrawer({ projeto, onClose }: { projeto: any; onClose: () => void }) {
+  const gerar = useServerFn(gerarNarrativaProjeto);
+  const [narrativa, setNarrativa] = useState<any | null>(null);
+  const [imagens, setImagens] = useState<any[]>([]);
+  const [aba, setAba] = useState<
+    "partido" | "sequencia" | "caso" | "carrossel" | "reels" | "site" | "email"
+  >("partido");
+
+  const { data: contagem } = useQuery({
+    queryKey: ["projeto-count", projeto.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("biblioteca_imagens")
+        .select("id", { count: "exact", head: true })
+        .eq("projeto_id", projeto.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const mut = useMutation({
+    mutationFn: async () => gerar({ data: { projeto_id: projeto.id } }),
+    onSuccess: (res: any) => {
+      setNarrativa(res.narrativa);
+      setImagens(res.imagens ?? []);
+      toast.success("Narrativa gerada.");
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao gerar narrativa"),
+  });
+
+  const insuficiente = (contagem ?? 0) < 3;
+
+  const textoAba = (() => {
+    if (!narrativa) return "";
+    switch (aba) {
+      case "partido": return narrativa.partido_central ?? "";
+      case "carrossel": return narrativa.conteudos?.carrossel_projeto ?? "";
+      case "reels": return narrativa.conteudos?.roteiro_reels_90s ?? "";
+      case "site": return narrativa.conteudos?.texto_site ?? "";
+      case "email": return narrativa.conteudos?.email_apresentacao ?? "";
+      default: return "";
+    }
+  })();
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="w-full md:w-[760px] bg-white h-full overflow-y-auto border-l border-[color:var(--divisoria)]">
+        <div className="sticky top-0 bg-white z-10 border-b border-[color:var(--divisoria)] px-5 py-3 flex items-center justify-between">
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+              NARRATIVA DO PROJETO · LINHA {projeto.linha}
+            </div>
+            <div className="font-serif text-lg mt-0.5">{projeto.nome}</div>
+          </div>
+          <button onClick={onClose} className="p-1"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div className="font-mono text-[10px] tracking-widest text-[color:var(--muted-foreground)]">
+            {contagem ?? 0} imagens catalogadas
+          </div>
+
+          {!narrativa && (
+            <div className="border border-dashed border-[color:var(--divisoria)] rounded-lg p-6 text-center">
+              {insuficiente ? (
+                <div className="text-sm text-[color:var(--muted-foreground)]">
+                  O projeto precisa ter pelo menos <b>3 imagens catalogadas</b> para gerar a narrativa.
+                </div>
+              ) : (
+                <button
+                  onClick={() => mut.mutate()}
+                  disabled={mut.isPending}
+                  className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-5 py-2.5 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40"
+                >
+                  {mut.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando…</> : <><Sparkles className="h-4 w-4" /> Gerar narrativa completa do projeto</>}
+                </button>
+              )}
+            </div>
+          )}
+
+          {narrativa && (
+            <>
+              <div>
+                <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1">
+                  TÍTULO EDITORIAL
+                </div>
+                <div className="font-serif text-2xl text-[color:var(--graphite)]">
+                  {narrativa.titulo_projeto}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { k: "partido", l: "Partido" },
+                  { k: "sequencia", l: "Sequência" },
+                  { k: "caso", l: "Estudo de caso" },
+                  { k: "carrossel", l: "Carrossel" },
+                  { k: "reels", l: "Reels 90s" },
+                  { k: "site", l: "Texto site" },
+                  { k: "email", l: "E-mail" },
+                ].map((t) => (
+                  <button
+                    key={t.k}
+                    onClick={() => setAba(t.k as any)}
+                    className={`px-2.5 py-1 text-[10px] font-mono tracking-widest uppercase rounded-[3px] border transition-colors ${
+                      aba === t.k
+                        ? "bg-[color:var(--graphite)] text-white border-[color:var(--graphite)]"
+                        : "bg-white text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                    }`}
+                  >
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+
+              {aba === "sequencia" ? (
+                <div className="space-y-4">
+                  {(narrativa.sequencia_narrativa ?? []).map((s: any, i: number) => {
+                    const img = imagens.find((im) => (im.ambiente ?? "").toLowerCase() === (s.imagem_ambiente ?? "").toLowerCase());
+                    return (
+                      <div key={i} className="border border-[color:var(--divisoria)] rounded-lg p-4 bg-white">
+                        <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] uppercase mb-1">
+                          {String(i + 1).padStart(2, "0")} · {s.imagem_ambiente}
+                        </div>
+                        <div className="font-serif text-lg text-[color:var(--graphite)] mb-1">{s.titulo}</div>
+                        <p className="text-sm text-[color:var(--graphite)] leading-relaxed">{s.texto}</p>
+                        {img && (
+                          <div className="mt-2 text-[10px] font-mono tracking-widest text-[color:var(--muted-foreground)]">
+                            Imagem: {(img.tags ?? []).slice(0, 3).join(", ")}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : aba === "caso" ? (
+                <div className="space-y-3 text-sm">
+                  <Bloco label="Problema" texto={narrativa.estudo_de_caso?.problema} />
+                  <Bloco label="Partido" texto={narrativa.estudo_de_caso?.partido} />
+                  <div>
+                    <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1">SOLUÇÕES</div>
+                    <ul className="space-y-1.5">
+                      {(narrativa.estudo_de_caso?.solucoes ?? []).map((s: string, i: number) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-[color:var(--bronze)]">·</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <Bloco label="Resultado" texto={narrativa.estudo_de_caso?.resultado} />
+                </div>
+              ) : (
+                <div className="border border-[color:var(--divisoria)] rounded-lg bg-white p-4 text-sm whitespace-pre-wrap min-h-[120px] leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>
+                  {textoAba || "—"}
+                </div>
+              )}
+
+              {aba !== "sequencia" && aba !== "caso" && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(textoAba).then(
+                      () => toast.success("Texto copiado."),
+                      () => toast.error("Não foi possível copiar."),
+                    );
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                >
+                  <Copy className="h-3 w-3" /> Copiar
+                </button>
+              )}
+
+              <button
+                onClick={() => mut.mutate()}
+                disabled={mut.isPending}
+                className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-4 py-2 text-xs hover:border-[color:var(--bronze)] disabled:opacity-40"
+              >
+                {mut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                Regenerar narrativa
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Bloco({ label, texto }: { label: string; texto?: string }) {
+  return (
+    <div>
+      <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1 uppercase">{label}</div>
+      <p className="text-sm text-[color:var(--graphite)] leading-relaxed">{texto ?? "—"}</p>
     </div>
   );
 }
