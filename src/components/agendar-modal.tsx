@@ -3,7 +3,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { agendarViaWebhook } from "@/lib/make.functions";
 import { toast } from "sonner";
-import { Send, X, Loader2, CalendarClock } from "lucide-react";
+import { Send, X, Loader2, CalendarClock, Image as ImageIcon, Trash2 } from "lucide-react";
+import { BibliotecaPicker, type BibliotecaImagemLite, signBibliotecaUrls } from "@/components/biblioteca-picker";
 
 type Kind = "posicionamento" | "projeto" | "bastidor";
 
@@ -56,11 +57,14 @@ export function AgendarModal({
   const [texto, setTexto] = useState(initialText);
   const [quando, setQuando] = useState<string>(toLocalInput(nextSuggestion(kind)));
   const [canal, setCanal] = useState<string>("instagram");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [imagem, setImagem] = useState<{ url: string; nome: string } | null>(null);
 
   useEffect(() => {
     if (open) {
       setTexto(initialText);
       setQuando(toLocalInput(nextSuggestion(kind)));
+      setImagem(null);
     }
   }, [open, initialText, kind]);
 
@@ -80,6 +84,7 @@ export function AgendarModal({
           conteudo_tipo: kind,
           origem,
           post_id: postId,
+          imagem_url: imagem?.url ?? null,
         },
       }),
     onSuccess: () => {
@@ -90,6 +95,20 @@ export function AgendarModal({
     },
     onError: (err: any) => toast.error(err?.message ?? "Falha ao agendar publicação"),
   });
+
+  async function handlePick(img: BibliotecaImagemLite) {
+    let url = img.signed_url;
+    if (!url) {
+      const map = await signBibliotecaUrls([img.url_storage]);
+      url = map[img.url_storage];
+    }
+    if (!url) {
+      toast.error("Não foi possível obter a URL da imagem.");
+      return;
+    }
+    setImagem({ url, nome: img.nome_arquivo });
+    setPickerOpen(false);
+  }
 
   if (!open) return null;
 
@@ -152,6 +171,39 @@ export function AgendarModal({
               </select>
             </label>
           </div>
+
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-2">
+              IMAGEM DO POST <span className="text-[color:var(--muted-foreground)] normal-case">(opcional)</span>
+            </div>
+            {imagem ? (
+              <div className="flex items-center gap-3 border border-[color:var(--divisoria)] rounded-[4px] bg-white p-2">
+                <img src={imagem.url} alt={imagem.nome} className="h-16 w-16 object-cover rounded-[3px]" />
+                <div className="flex-1 text-xs text-[color:var(--graphite)] line-clamp-2">{imagem.nome}</div>
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  className="rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-1.5 text-xs text-[color:var(--graphite)] hover:border-[color:var(--bronze)]"
+                >
+                  Trocar
+                </button>
+                <button
+                  onClick={() => setImagem(null)}
+                  className="p-2 text-[color:var(--muted-foreground)] hover:text-[color:var(--graphite)]"
+                  title="Remover imagem"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setPickerOpen(true)}
+                className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-3 py-2 text-sm text-[color:var(--graphite)] hover:border-[color:var(--bronze)]"
+              >
+                <ImageIcon className="h-4 w-4" />
+                Escolher da biblioteca
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[color:var(--divisoria)] bg-[color:var(--gelo)]">
@@ -171,6 +223,7 @@ export function AgendarModal({
           </button>
         </div>
       </div>
+      <BibliotecaPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handlePick} />
     </div>
   );
 }
