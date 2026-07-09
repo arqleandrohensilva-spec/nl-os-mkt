@@ -1490,3 +1490,203 @@ function DrawerAntesDepois({ comparativo, onClose }: { comparativo: any; onClose
     </div>
   );
 }
+// ============================================================
+// NARRATIVA DO PROJETO
+// ============================================================
+function NarrativaProjetoDrawer({ projeto, onClose }: { projeto: any; onClose: () => void }) {
+  const gerar = useServerFn(gerarNarrativaProjeto);
+  const [narrativa, setNarrativa] = useState<any | null>(null);
+  const [imagens, setImagens] = useState<any[]>([]);
+  const [aba, setAba] = useState<
+    "partido" | "sequencia" | "caso" | "carrossel" | "reels" | "site" | "email"
+  >("partido");
+
+  const { data: contagem } = useQuery({
+    queryKey: ["projeto-count", projeto.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("biblioteca_imagens")
+        .select("id", { count: "exact", head: true })
+        .eq("projeto_id", projeto.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const mut = useMutation({
+    mutationFn: async () => gerar({ data: { projeto_id: projeto.id } }),
+    onSuccess: (res: any) => {
+      setNarrativa(res.narrativa);
+      setImagens(res.imagens ?? []);
+      toast.success("Narrativa gerada.");
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao gerar narrativa"),
+  });
+
+  const insuficiente = (contagem ?? 0) < 3;
+
+  const textoAba = (() => {
+    if (!narrativa) return "";
+    switch (aba) {
+      case "partido": return narrativa.partido_central ?? "";
+      case "carrossel": return narrativa.conteudos?.carrossel_projeto ?? "";
+      case "reels": return narrativa.conteudos?.roteiro_reels_90s ?? "";
+      case "site": return narrativa.conteudos?.texto_site ?? "";
+      case "email": return narrativa.conteudos?.email_apresentacao ?? "";
+      default: return "";
+    }
+  })();
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="w-full md:w-[760px] bg-white h-full overflow-y-auto border-l border-[color:var(--divisoria)]">
+        <div className="sticky top-0 bg-white z-10 border-b border-[color:var(--divisoria)] px-5 py-3 flex items-center justify-between">
+          <div>
+            <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)]">
+              NARRATIVA DO PROJETO · LINHA {projeto.linha}
+            </div>
+            <div className="font-serif text-lg mt-0.5">{projeto.nome}</div>
+          </div>
+          <button onClick={onClose} className="p-1"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div className="font-mono text-[10px] tracking-widest text-[color:var(--muted-foreground)]">
+            {contagem ?? 0} imagens catalogadas
+          </div>
+
+          {!narrativa && (
+            <div className="border border-dashed border-[color:var(--divisoria)] rounded-lg p-6 text-center">
+              {insuficiente ? (
+                <div className="text-sm text-[color:var(--muted-foreground)]">
+                  O projeto precisa ter pelo menos <b>3 imagens catalogadas</b> para gerar a narrativa.
+                </div>
+              ) : (
+                <button
+                  onClick={() => mut.mutate()}
+                  disabled={mut.isPending}
+                  className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] px-5 py-2.5 text-sm text-white hover:bg-[color:var(--bronze)] transition-colors disabled:opacity-40"
+                >
+                  {mut.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando…</> : <><Sparkles className="h-4 w-4" /> Gerar narrativa completa do projeto</>}
+                </button>
+              )}
+            </div>
+          )}
+
+          {narrativa && (
+            <>
+              <div>
+                <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1">
+                  TÍTULO EDITORIAL
+                </div>
+                <div className="font-serif text-2xl text-[color:var(--graphite)]">
+                  {narrativa.titulo_projeto}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { k: "partido", l: "Partido" },
+                  { k: "sequencia", l: "Sequência" },
+                  { k: "caso", l: "Estudo de caso" },
+                  { k: "carrossel", l: "Carrossel" },
+                  { k: "reels", l: "Reels 90s" },
+                  { k: "site", l: "Texto site" },
+                  { k: "email", l: "E-mail" },
+                ].map((t) => (
+                  <button
+                    key={t.k}
+                    onClick={() => setAba(t.k as any)}
+                    className={`px-2.5 py-1 text-[10px] font-mono tracking-widest uppercase rounded-[3px] border transition-colors ${
+                      aba === t.k
+                        ? "bg-[color:var(--graphite)] text-white border-[color:var(--graphite)]"
+                        : "bg-white text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                    }`}
+                  >
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+
+              {aba === "sequencia" ? (
+                <div className="space-y-4">
+                  {(narrativa.sequencia_narrativa ?? []).map((s: any, i: number) => {
+                    const img = imagens.find((im) => (im.ambiente ?? "").toLowerCase() === (s.imagem_ambiente ?? "").toLowerCase());
+                    return (
+                      <div key={i} className="border border-[color:var(--divisoria)] rounded-lg p-4 bg-white">
+                        <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] uppercase mb-1">
+                          {String(i + 1).padStart(2, "0")} · {s.imagem_ambiente}
+                        </div>
+                        <div className="font-serif text-lg text-[color:var(--graphite)] mb-1">{s.titulo}</div>
+                        <p className="text-sm text-[color:var(--graphite)] leading-relaxed">{s.texto}</p>
+                        {img && (
+                          <div className="mt-2 text-[10px] font-mono tracking-widest text-[color:var(--muted-foreground)]">
+                            Imagem: {(img.tags ?? []).slice(0, 3).join(", ")}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : aba === "caso" ? (
+                <div className="space-y-3 text-sm">
+                  <Bloco label="Problema" texto={narrativa.estudo_de_caso?.problema} />
+                  <Bloco label="Partido" texto={narrativa.estudo_de_caso?.partido} />
+                  <div>
+                    <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1">SOLUÇÕES</div>
+                    <ul className="space-y-1.5">
+                      {(narrativa.estudo_de_caso?.solucoes ?? []).map((s: string, i: number) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-[color:var(--bronze)]">·</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <Bloco label="Resultado" texto={narrativa.estudo_de_caso?.resultado} />
+                </div>
+              ) : (
+                <div className="border border-[color:var(--divisoria)] rounded-lg bg-white p-4 text-sm whitespace-pre-wrap min-h-[120px] leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>
+                  {textoAba || "—"}
+                </div>
+              )}
+
+              {aba !== "sequencia" && aba !== "caso" && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(textoAba).then(
+                      () => toast.success("Texto copiado."),
+                      () => toast.error("Não foi possível copiar."),
+                    );
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                >
+                  <Copy className="h-3 w-3" /> Copiar
+                </button>
+              )}
+
+              <button
+                onClick={() => mut.mutate()}
+                disabled={mut.isPending}
+                className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white px-4 py-2 text-xs hover:border-[color:var(--bronze)] disabled:opacity-40"
+              >
+                {mut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                Regenerar narrativa
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Bloco({ label, texto }: { label: string; texto?: string }) {
+  return (
+    <div>
+      <div className="font-mono text-[10px] tracking-widest text-[color:var(--bronze)] mb-1 uppercase">{label}</div>
+      <p className="text-sm text-[color:var(--graphite)] leading-relaxed">{texto ?? "—"}</p>
+    </div>
+  );
+}
