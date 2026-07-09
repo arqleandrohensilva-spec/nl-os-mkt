@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { LINHAS, FORMATOS } from "@/lib/nl-brand";
 import { Loader2, Copy, AlertTriangle, Image as ImageIcon, X } from "lucide-react";
 import { BibliotecaPicker, type BibliotecaImagemLite } from "@/components/biblioteca-picker";
+import { BufferButton } from "@/components/buffer-modal";
 import { toast } from "sonner";
 
 type Search = { dor?: string; linha?: string; formato?: string; observacao?: string };
@@ -303,6 +304,12 @@ function MotorCopy() {
               <PrimaryButton disabled={salvar.isPending} onClick={() => salvar.mutate()}>
                 {salvar.isPending ? "Salvando…" : "Salvar no calendário"}
               </PrimaryButton>
+              <BufferButton
+                text={output.copy_legenda}
+                origem="copy"
+                variant="secondary"
+                kind={formato === "reels" ? "projeto" : "posicionamento"}
+              />
               <SecondaryButton
                 onClick={() =>
                   navigate({

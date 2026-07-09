@@ -12,6 +12,7 @@ import {
 } from "@/lib/antes-depois.functions";
 import { signBibliotecaUrls } from "@/components/biblioteca-picker";
 import { BibliotecaPicker, type BibliotecaImagemLite } from "@/components/biblioteca-picker";
+import { BufferButton } from "@/components/buffer-modal";
 import {
   X,
   Upload,
@@ -407,6 +408,15 @@ function DrawerDetalhes({ imagem, onClose }: { imagem: any; onClose: () => void 
               <button onClick={copiar} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[4px] border border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]">
                 <Copy className="h-3 w-3" /> Copiar
               </button>
+              {textoAtual && (
+                <BufferButton
+                  text={textoAtual}
+                  variant="chip"
+                  origem={`biblioteca:${conteudoTab}`}
+                  kind={conteudoTab === "reels" || conteudoTab === "roteiro" ? "projeto" : conteudoTab === "stories" ? "bastidor" : "posicionamento"}
+                  label="Agendar no Buffer"
+                />
+              )}
             </div>
           </div>
 

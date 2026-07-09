@@ -8,6 +8,7 @@ import { LINHAS, PILARES } from "@/lib/nl-brand";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Copy, RotateCcw, Square, Layers, Play, Briefcase, Mail, Save, Image as ImageIcon, X } from "lucide-react";
 import { BibliotecaPicker, type BibliotecaImagemLite } from "@/components/biblioteca-picker";
+import { BufferButton } from "@/components/buffer-modal";
 import { toast } from "sonner";
 
 type Search = { conteudo?: string };
@@ -204,6 +205,8 @@ function KitPublicacaoPage() {
                 label="INSTAGRAM FEED"
                 onCopy={() => copiar(resultado.feed)}
                 counter={`${resultado.feed.length} / 2.200`}
+                bufferText={resultado.feed}
+                bufferKind="projeto"
               >
                 <p className="whitespace-pre-wrap">{resultado.feed}</p>
               </CanalCard>
@@ -232,6 +235,8 @@ function KitPublicacaoPage() {
                 icon={<Play className="h-4 w-4" />}
                 label="REELS — LEGENDA"
                 onCopy={() => copiar(resultado.reels)}
+                bufferText={resultado.reels}
+                bufferKind="projeto"
                 footer={
                   <span className="text-[color:var(--muted-foreground)]">
                     Primeiras 125 caracteres aparecem antes do "ver mais".
@@ -248,6 +253,8 @@ function KitPublicacaoPage() {
                 icon={<Briefcase className="h-4 w-4" />}
                 label="LINKEDIN"
                 onCopy={() => copiar(resultado.linkedin)}
+                bufferText={resultado.linkedin}
+                bufferKind="posicionamento"
               >
                 <p className="whitespace-pre-wrap">{resultado.linkedin}</p>
               </CanalCard>
@@ -321,6 +328,8 @@ function CanalCard({
   counter,
   footer,
   className = "",
+  bufferText,
+  bufferKind,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -329,6 +338,8 @@ function CanalCard({
   counter?: string;
   footer?: React.ReactNode;
   className?: string;
+  bufferText?: string;
+  bufferKind?: "posicionamento" | "projeto" | "bastidor";
 }) {
   return (
     <div
@@ -359,6 +370,15 @@ function CanalCard({
         >
           <Copy className="h-3 w-3" /> Copiar
         </button>
+        {bufferText && (
+          <BufferButton
+            text={bufferText}
+            variant="chip"
+            origem="kit-publicacao"
+            kind={bufferKind}
+            label="Agendar no Buffer"
+          />
+        )}
       </div>
     </div>
   );
