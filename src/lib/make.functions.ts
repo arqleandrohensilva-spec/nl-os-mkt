@@ -102,6 +102,7 @@ export const agendarViaWebhook = createServerFn({ method: "POST" })
         conteudo_tipo: z.string().min(1),
         origem: z.string().optional(),
         post_id: z.string().uuid().optional(),
+        imagem_url: z.string().url().nullable().optional(),
       })
       .parse(input),
   )
@@ -121,6 +122,7 @@ export const agendarViaWebhook = createServerFn({ method: "POST" })
         canal: data.canal,
         conteudo_tipo: data.conteudo_tipo,
         origem: data.origem ?? "nl_os_mkt",
+        imagem_url: data.imagem_url ?? null,
       }),
     });
     if (!res.ok) {
