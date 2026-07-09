@@ -302,7 +302,14 @@ export const gerarNarrativaProjeto = createServerFn({ method: "POST" })
     const userText = `Projeto: ${projeto.nome}\nLinha: ${projeto.linha}\nDescrição do projeto: ${projeto.descricao ?? "—"}\n\nAs ${imagens.length} imagens catalogadas deste projeto são:\n\n${dossie}\n\nGere a narrativa completa conforme instruído. Responda apenas com JSON puro.`;
 
     const { text, usage } = await callAnthropic(SYSTEM_NARRATIVA, [{ type: "text", text: userText }], 8000);
-    const parsed = parseJson<Record<string, unknown>>(text);
+    type Narrativa = {
+      titulo_projeto: string;
+      partido_central: string;
+      sequencia_narrativa: Array<{ imagem_ambiente: string; titulo: string; texto: string }>;
+      estudo_de_caso: { problema: string; partido: string; solucoes: string[]; resultado: string };
+      conteudos: { carrossel_projeto: string; roteiro_reels_90s: string; texto_site: string; email_apresentacao: string };
+    };
+    const parsed = parseJson<Narrativa>(text);
 
     await logAnthropicUsage({
       modulo: "biblioteca",
