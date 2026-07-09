@@ -8,6 +8,7 @@ import {
   atualizarLancamento,
   buscarLancamentos,
   gerarConteudosLancamento,
+  adicionarManual,
 } from "@/lib/radar-mercado.functions";
 import {
   Loader2,
@@ -17,6 +18,7 @@ import {
   Sparkles,
   Archive,
   CheckCircle2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -97,6 +99,7 @@ function RadarMercadoPage() {
   const buscar = useServerFn(buscarLancamentos);
   const gerar = useServerFn(gerarConteudosLancamento);
   const atualizar = useServerFn(atualizarLancamento);
+  const adicionar = useServerFn(adicionarManual);
 
   const [filtroTipo, setFiltroTipo] = useState<string>("");
   const [filtroCidade, setFiltroCidade] = useState<string>("");
@@ -104,6 +107,8 @@ function RadarMercadoPage() {
   const [filtroLinha, setFiltroLinha] = useState<string>("");
   const [aberto, setAberto] = useState<Lancamento | null>(null);
   const [loadingStage, setLoadingStage] = useState<"idle" | "buscando" | "analisando">("idle");
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualStage, setManualStage] = useState<"idle" | "pesquisando" | "consolidando" | "criando">("idle");
 
   const { data: lancamentos } = useQuery({
     queryKey: ["lancamentos"],
@@ -158,6 +163,33 @@ function RadarMercadoPage() {
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Falha ao gerar conteúdos."),
+  });
+
+  const manualMut = useMutation({
+    mutationFn: async (input: { nome: string; informacoes_brutas: string; tipo: string; cidade: string }) => {
+      setManualStage("pesquisando");
+      // Encenar estágios visuais durante a chamada
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      timers.push(setTimeout(() => setManualStage("consolidando"), 4000));
+      timers.push(setTimeout(() => setManualStage("criando"), 9000));
+      try {
+        const row = await adicionar({ data: input });
+        return row;
+      } finally {
+        timers.forEach(clearTimeout);
+      }
+    },
+    onSuccess: async (row) => {
+      setManualStage("idle");
+      setManualOpen(false);
+      toast.success("Lançamento adicionado.");
+      await qc.invalidateQueries({ queryKey: ["lancamentos"] });
+      if (row) setAberto(row as Lancamento);
+    },
+    onError: (e: unknown) => {
+      setManualStage("idle");
+      toast.error(e instanceof Error ? e.message : "Falha ao adicionar lançamento.");
+    },
   });
 
   const atualizarMut = useMutation({
@@ -220,25 +252,34 @@ function RadarMercadoPage() {
                   : "Nenhuma busca registrada ainda."}
               </div>
             </div>
-            <button
-              onClick={() => buscarMut.mutate()}
-              disabled={buscarMut.isPending}
-              className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] text-white px-5 py-3 text-sm hover:bg-black disabled:opacity-60"
-            >
-              {buscarMut.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {loadingStage === "buscando"
-                    ? "Buscando lançamentos em SJC..."
-                    : "Analisando oportunidades..."}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  Buscar lançamentos agora
-                </>
-              )}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={() => buscarMut.mutate()}
+                disabled={buscarMut.isPending}
+                className="inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--graphite)] text-white px-5 py-3 text-sm hover:bg-black disabled:opacity-60"
+              >
+                {buscarMut.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {loadingStage === "buscando"
+                      ? "Buscando lançamentos em SJC..."
+                      : "Analisando oportunidades..."}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Buscar lançamentos agora
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setManualOpen(true)}
+                className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] bg-white text-[color:var(--graphite)] px-5 py-3 text-sm hover:border-[color:var(--bronze)] hover:text-[color:var(--bronze)]"
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar manualmente
+              </button>
+            </div>
           </div>
 
           {/* Filtros */}
@@ -363,6 +404,17 @@ function RadarMercadoPage() {
               },
             })
           }
+        />
+      )}
+
+      {manualOpen && (
+        <ManualModal
+          onClose={() => {
+            if (!manualMut.isPending) setManualOpen(false);
+          }}
+          onSubmit={(v) => manualMut.mutate(v)}
+          loading={manualMut.isPending}
+          stage={manualStage}
         />
       )}
     </>
