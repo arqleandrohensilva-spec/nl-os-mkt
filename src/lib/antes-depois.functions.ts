@@ -86,6 +86,15 @@ function serverSb() {
   );
 }
 
+function detectMediaType(base64: string): string {
+  const header = base64.substring(0, 20);
+  if (header.startsWith("/9j/")) return "image/jpeg";
+  if (header.startsWith("iVBORw0KGgo")) return "image/png";
+  if (header.startsWith("R0lGOD")) return "image/gif";
+  if (header.startsWith("UklGR")) return "image/webp";
+  return "image/jpeg";
+}
+
 function parseJson<T>(content: string): T {
   try {
     return JSON.parse(content) as T;
@@ -167,8 +176,8 @@ async function gerarConteudoAD(
 ) {
   const userText = `Linha: ${linha}. Ambiente: ${ambiente ?? "(a detectar)"}. Analise a transformação entre as duas imagens (a primeira é o ANTES, a segunda é o DEPOIS) e gere todos os conteúdos conforme instruído. Responda apenas com JSON puro.`;
   const { text, usage } = await callAnthropic(SYSTEM_AD, [
-    { type: "image", source: { type: "base64", media_type: antesMt, data: antesB64 } },
-    { type: "image", source: { type: "base64", media_type: depoisMt, data: depoisB64 } },
+    { type: "image", source: { type: "base64", media_type: detectMediaType(antesB64), data: antesB64 } },
+    { type: "image", source: { type: "base64", media_type: detectMediaType(depoisB64), data: depoisB64 } },
     { type: "text", text: userText },
   ]);
   return { parsed: parseJson<AntesDepoisResultado>(text), usage };

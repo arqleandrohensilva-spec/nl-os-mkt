@@ -97,6 +97,15 @@ function serverSb() {
   );
 }
 
+function detectMediaType(base64: string): string {
+  const header = base64.substring(0, 20);
+  if (header.startsWith("/9j/")) return "image/jpeg";
+  if (header.startsWith("iVBORw0KGgo")) return "image/png";
+  if (header.startsWith("R0lGOD")) return "image/gif";
+  if (header.startsWith("UklGR")) return "image/webp";
+  return "image/jpeg";
+}
+
 async function callVision(
   base64: string,
   media_type: string,
@@ -135,7 +144,7 @@ async function callVision(
         {
           role: "user",
           content: [
-            { type: "image", source: { type: "base64", media_type, data: base64 } },
+            { type: "image", source: { type: "base64", media_type: detectMediaType(base64), data: base64 } },
             { type: "text", text: userText },
           ],
         },
