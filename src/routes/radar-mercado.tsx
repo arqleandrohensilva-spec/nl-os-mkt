@@ -497,6 +497,7 @@ function Drawer({
   onStatus,
   onNotas,
   onCriarPost,
+  onProspectar,
 }: {
   lancamento: Lancamento;
   onClose: () => void;
@@ -505,6 +506,7 @@ function Drawer({
   onStatus: (s: string) => void;
   onNotas: (v: string) => void;
   onCriarPost: () => void;
+  onProspectar: () => void;
 }) {
   const [aba, setAba] = useState<"post" | "gancho" | "abordagem" | "cta">("post");
   const [notas, setNotas] = useState(lancamento.notas ?? "");
@@ -654,12 +656,21 @@ function Drawer({
             </button>
             {lancamento.status !== "prospectado" && (
               <button
-                onClick={() => onStatus("prospectado")}
+                onClick={onProspectar}
                 className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--divisoria)] px-4 py-2 text-sm hover:border-[color:var(--bronze)]"
               >
                 <CheckCircle2 className="h-4 w-4" />
                 Marcar como prospectado
               </button>
+            )}
+            {lancamento.status === "prospectado" && (
+              <Link
+                to="/prospeccao"
+                className="inline-flex items-center gap-2 rounded-[4px] border border-[color:var(--bronze)] text-[color:var(--bronze)] px-4 py-2 text-sm hover:bg-[color:var(--bege)]"
+              >
+                <UserCheck className="h-4 w-4" />
+                Ver no CRM
+              </Link>
             )}
             {lancamento.status !== "arquivado" && (
               <button
