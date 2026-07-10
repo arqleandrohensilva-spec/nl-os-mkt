@@ -140,18 +140,47 @@ function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
     },
   });
 
+  const { data: buscaMatches } = useQuery({
+    queryKey: ["biblioteca-busca", busca],
+    enabled: busca.trim().length > 0,
+    queryFn: async () => {
+      const termo = busca.trim().toLowerCase();
+      const [porTag, porDesc] = await Promise.all([
+        supabase.from("biblioteca_imagens").select("id").contains("tags", [termo]),
+        supabase.from("biblioteca_imagens").select("id").ilike("descricao_tecnica", `%${termo}%`),
+      ]);
+      const ids = new Set<string>();
+      (porTag.data ?? []).forEach((r: any) => ids.add(r.id));
+      (porDesc.data ?? []).forEach((r: any) => ids.add(r.id));
+      return ids;
+    },
+  });
+
   const filtradas = useMemo(() => {
     const arr = imagens ?? [];
     if (!busca.trim()) return arr;
-    const b = busca.toLowerCase();
-    return arr.filter(
-      (i: any) =>
-        i.tags?.some((t: string) => t.toLowerCase().includes(b)) ||
-        i.ambiente?.toLowerCase().includes(b) ||
-        i.descricao_tecnica?.toLowerCase().includes(b) ||
-        i.nome_arquivo?.toLowerCase().includes(b),
-    );
-  }, [imagens, busca]);
+    if (!buscaMatches) return [];
+    return arr.filter((i: any) => buscaMatches.has(i.id));
+  }, [imagens, busca, buscaMatches]);
+
+  const { data: topTags } = useQuery({
+    queryKey: ["biblioteca-top-tags"],
+    queryFn: async () => {
+      const { data } = await supabase.from("biblioteca_imagens").select("tags");
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((r: any) => {
+        (r.tags ?? []).forEach((t: string) => {
+          if (!t) return;
+          const k = t.toLowerCase();
+          counts[k] = (counts[k] ?? 0) + 1;
+        });
+      });
+      return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([tag, count]) => ({ tag, count }));
+    },
+  });
 
   const totalProjetos = new Set((imagens ?? []).map((i: any) => i.projeto_id).filter(Boolean)).size;
 
@@ -171,6 +200,28 @@ function AbaBiblioteca({ projetoInicial }: { projetoInicial?: string }) {
           />
         </div>
       </div>
+
+      {(topTags ?? []).length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {topTags!.map((t) => {
+            const ativa = busca.trim().toLowerCase() === t.tag;
+            return (
+              <button
+                key={t.tag}
+                onClick={() => setBusca(ativa ? "" : t.tag)}
+                className={`text-[10px] font-mono tracking-widest uppercase px-2 py-1 rounded-[3px] border transition-colors ${
+                  ativa
+                    ? "bg-[color:var(--bronze)] text-white border-[color:var(--bronze)]"
+                    : "bg-[color:var(--gelo)] text-[color:var(--graphite)] border-[color:var(--divisoria)] hover:border-[color:var(--bronze)]"
+                }`}
+              >
+                {t.tag}
+                <span className="ml-1 opacity-60">{t.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <FilterSel value={linha} onChange={setLinha} label="Linha">
