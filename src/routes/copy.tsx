@@ -48,6 +48,44 @@ function MotorCopy() {
     },
   });
 
+  const { data: perfPorDor } = useQuery({
+    queryKey: ["dor-performance"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("posts")
+        .select("dor_id, performance(curtidas, comentarios, salvamentos)")
+        .eq("status", "publicado");
+      if (error) throw error;
+      const map: Record<string, { total: number; count: number }> = {};
+      (data ?? []).forEach((p: any) => {
+        const perf = p.performance?.[0];
+        if (!perf || !p.dor_id) return;
+        const eng = (perf.curtidas ?? 0) + (perf.comentarios ?? 0) + (perf.salvamentos ?? 0);
+        map[p.dor_id] ??= { total: 0, count: 0 };
+        map[p.dor_id].total += eng;
+        map[p.dor_id].count += 1;
+      });
+      const media: Record<string, number> = {};
+      Object.entries(map).forEach(([id, v]) => { media[id] = Math.round(v.total / v.count); });
+      return { media, totalPosts: (data ?? []).filter((p: any) => p.performance?.[0]).length };
+    },
+  });
+
+  const doresOrdenadas = useMemo(() => {
+    const media = perfPorDor?.media ?? {};
+    const arr = [...(dores ?? [])].map((d: any) => {
+      const m = media[d.id];
+      let tier: "top" | "meio" | "nunca" = "meio";
+      let sufixo = "";
+      if (m !== undefined && m > 50) { tier = "top"; sufixo = " · TOP"; }
+      else if (m === undefined && !d.ultima_vez_usada) { tier = "nunca"; sufixo = " · (nunca usada)"; }
+      return { ...d, tier, sufixo, media: m };
+    });
+    const rank: Record<string, number> = { top: 0, meio: 1, nunca: 2 };
+    arr.sort((a: any, b: any) => rank[a.tier] - rank[b.tier] || a.titulo.localeCompare(b.titulo));
+    return arr;
+  }, [dores, perfPorDor]);
+
   const dorSelecionada = useMemo(
     () => (dores ?? []).find((d: any) => d.id === dorId),
     [dores, dorId],
@@ -163,10 +201,15 @@ function MotorCopy() {
             <Field label="Dor da persona">
               <Select value={dorId} onChange={setDorId}>
                 <option value="">Selecione uma dor…</option>
-                {(dores ?? []).map((d: any) => (
-                  <option key={d.id} value={d.id}>{d.titulo}</option>
+                {doresOrdenadas.map((d: any) => (
+                  <option key={d.id} value={d.id}>{d.titulo}{d.sufixo}</option>
                 ))}
               </Select>
+              <p className="mt-2 text-xs text-[color:var(--muted-foreground)]">
+                {(perfPorDor?.totalPosts ?? 0) === 0
+                  ? "Registre performance de posts para ver quais dores performam melhor."
+                  : `Baseado em ${perfPorDor?.totalPosts} posts publicados com performance registrada.`}
+              </p>
             </Field>
             <Field label="Observação (opcional)">
               <textarea
